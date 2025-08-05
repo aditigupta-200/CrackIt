@@ -49,6 +49,7 @@ export const login = asyncHandler(async (req, res) => {
     username: user.username,
     email: user.email,
     role: user.role,
+    token: generateToken(user),
   });
 });
 
@@ -73,17 +74,16 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
   // Define fields that can be updated based on role
   const rolePermissions = {
-    employee: ["name", "email"], // Basic fields only
-    project_lead: ["name", "email"], // Same as employee
-    admin: ["name", "email"], // Same as employee and project_lead
-    super_admin: ["name", "email", "role"], // Can update role
+    candidate: ["username", "email"], // Changed from "name" to "username"
+    interviewer: ["username", "email"],
+    super_admin: ["username", "email", "role"], // Can update role
   };
 
   // Fields that are always restricted (cannot be updated via this endpoint)
   const restrictedFields = ["password", "_id", "createdAt", "updatedAt"];
 
   // Get allowed fields for the user's role
-  const allowedFields = rolePermissions[userRole] || rolePermissions.employee;
+  const allowedFields = rolePermissions[userRole] || rolePermissions.candidate;
 
   // Filter update data to only include allowed fields
   const filteredUpdateData = {};
@@ -113,7 +113,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
   // Validate role value if being updated
   if (filteredUpdateData.role) {
-    const validRoles = ["super_admin", "admin", "project_lead", "employee"];
+    const validRoles = ["candidate", "interviewer", "super_admin"]; // Updated to match User model
     if (!validRoles.includes(filteredUpdateData.role)) {
       throw new ApiError(400, "Invalid role specified");
     }
@@ -141,7 +141,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
     select: "-password",
   });
 
-  
   if (!updatedUser) {
     throw new ApiError(404, "User not found");
   }

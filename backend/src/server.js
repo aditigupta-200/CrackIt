@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import morgan from "morgan";
 import connectDB from "./config/db.js";
+import cookieParser from "cookie-parser";
 
 // Import Routes
 import authRoutes from "./routes/auth.route.js";
@@ -25,6 +26,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(morgan("dev"));
+app.use(cookieParser());
 
 // API Routes
 app.use("/api/auth", authRoutes);

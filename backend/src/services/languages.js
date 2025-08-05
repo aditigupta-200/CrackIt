@@ -1,6 +1,6 @@
 export const languages = {
-  javascript: 63,
+  javascript: 102,
   cpp: 54,
-  python: 71,
-  java: 62,
+  python: 109,
+  java: 91,
 };

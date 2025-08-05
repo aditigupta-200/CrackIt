@@ -8,8 +8,15 @@ import { verifyJWT } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
 
 const router = express.Router();
+
+// Fix the authorizeRoles usage
 router.post("/", verifyJWT, authorizeRoles("interviewer"), createInterview);
 router.get("/", verifyJWT, getAllInterviews);
-router.post("/apply", verifyJWT, authorizeRoles("candidate"), applyForInterview);
+router.post(
+  "/apply",
+  verifyJWT,
+  authorizeRoles("candidate"),
+  applyForInterview
+);
 
 export default router;
