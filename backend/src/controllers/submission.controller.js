@@ -47,177 +47,231 @@ export const runCode = async (req, res) => {
     }
     console.log("✅ Language ID:", languageId);
 
-    // Step 1: Send code to Judge0
-    console.log("📤 Sending to Judge0...");
-    const token = await createSubmission(sourceCode, languageId, input || "");
-    console.log("✅ Judge0 token received:", token);
+    // Process each test case individually
+    const testCaseResults = [];
+    let allTestCasesPassed = true;
 
-    // Step 2: Poll Judge0 until execution completes
-    let result;
-    let attempts = 0;
-    const maxAttempts = 15; // 30 seconds max wait time
+    for (let i = 0; i < question.testCases.length; i++) {
+      const testCase = question.testCases[i];
+      console.log(`Processing test case ${i + 1}:`, testCase);
 
-    do {
-      attempts++;
-      console.log(`⏳ Polling attempt ${attempts}/${maxAttempts}...`);
+      const expectedOutput = (testCase.expectedOutput || "").trim();
+      const formattedInput = testCase.input.replace(/\\n/g, "\n");
 
-      if (attempts > 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 sec
-      }
+      try {
+        // Execute code for this test case
+        const testCaseToken = await createSubmission(
+          sourceCode,
+          languageId,
+          formattedInput
+        );
 
-      result = await getSubmissionResult(token);
-      console.log(
-        "📊 Current status:",
-        result.status.description,
-        "(ID:",
-        result.status.id + ")"
-      );
+        // Poll for result
+        let testCaseOutput;
+        let attempts = 0;
+        const maxAttempts = 15;
 
-      if (attempts >= maxAttempts) {
-        console.log("⏰ Timeout reached");
-        return res.status(408).json({
-          message: "Code execution timeout. Please try again.",
+        do {
+          attempts++;
+          console.log(
+            `⏳ Test case ${
+              i + 1
+            } - Polling attempt ${attempts}/${maxAttempts}...`
+          );
+
+          if (attempts > 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+
+          testCaseOutput = await getSubmissionResult(testCaseToken);
+
+          if (attempts >= maxAttempts) {
+            console.log(`⏰ Timeout reached for test case ${i + 1}`);
+            testCaseResults.push({
+              testCaseNumber: i + 1,
+              input: testCase.input,
+              expectedOutput,
+              actualOutput: "Timeout",
+              status: "timeout",
+              passed: false,
+              executionTime: null,
+              memory: null,
+              error: "Execution timeout",
+            });
+            allTestCasesPassed = false;
+            break;
+          }
+        } while (testCaseOutput.status.id <= 2);
+
+        if (attempts < maxAttempts) {
+          const actualOutput = (testCaseOutput.stdout || "").trim();
+          const passed = actualOutput === expectedOutput;
+
+          if (!passed) {
+            allTestCasesPassed = false;
+          }
+
+          testCaseResults.push({
+            testCaseNumber: i + 1,
+            input: testCase.input,
+            expectedOutput,
+            actualOutput,
+            status: testCaseOutput.status.description.toLowerCase(),
+            passed,
+            executionTime: testCaseOutput.time,
+            memory: testCaseOutput.memory,
+            error: testCaseOutput.stderr || null,
+          });
+
+          console.log(`Test case ${i + 1} result:`, {
+            expected: expectedOutput,
+            actual: actualOutput,
+            passed,
+          });
+        }
+      } catch (error) {
+        console.error(`Error processing test case ${i + 1}:`, error);
+        testCaseResults.push({
+          testCaseNumber: i + 1,
+          input: testCase.input,
+          expectedOutput,
+          actualOutput: "Error",
+          status: "error",
+          passed: false,
+          executionTime: null,
+          memory: null,
+          error: error.message,
         });
+        allTestCasesPassed = false;
       }
-    } while (result.status.id <= 2); // 1 = In Queue, 2 = Processing
+    }
 
-    console.log("✅ Execution completed!");
-    console.log("📊 Final result:", {
-      status: result.status.description,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      time: result.time,
-      memory: result.memory,
-    });
+    // Calculate final results
+    const passedCount = testCaseResults.filter((tc) => tc.passed).length;
+    const failedCount = testCaseResults.length - passedCount;
 
-    // Simulate test case results (replace with actual logic)
-    const totalTestCases = question.testCases.length;
-    const testCasesPassed = Math.floor(Math.random() * totalTestCases);
-    const testCasesFailed = totalTestCases - testCasesPassed;
+    // Calculate points only if ALL test cases pass
+    let pointsEarned = 0;
+    if (allTestCasesPassed && passedCount > 0) {
+      switch (question.difficulty) {
+        case "easy":
+          pointsEarned = 5;
+          break;
+        case "medium":
+          pointsEarned = 10;
+          break;
+        case "hard":
+          pointsEarned = 20;
+          break;
+        default:
+          pointsEarned = 0;
+      }
+    }
 
-    // Step 3: Save submission
+    // Save submission
     const submission = await Submission.create({
       user: req.user._id,
       question: questionId,
       code: sourceCode,
       language,
-      status: result.status.description,
-      stdout: result.stdout,
-      stderr: result.stderr,
-      time: result.time,
-      memory: result.memory,
-      testCasesPassed,
-      testCasesFailed,
+      status: allTestCasesPassed ? "Accepted" : "Wrong Answer",
+      testCasesPassed: passedCount,
+      testCasesFailed: failedCount,
+      pointsEarned,
     });
-    console.log("💾 Submission saved:", submission._id);
 
-    // Calculate points based on question difficulty
-    let pointsEarned = 0;
-    switch (question.difficulty) {
-      case "easy":
-        pointsEarned = 5;
-        break;
-      case "medium":
-        pointsEarned = 10;
-        break;
-      case "hard":
-        pointsEarned = 20;
-        break;
-      default:
-        pointsEarned = 0;
+    // Update user stats only if all test cases pass
+    if (allTestCasesPassed && pointsEarned > 0) {
+      const user = await User.findById(req.user._id);
+      user.points += pointsEarned;
+      user.solvedQuestionsCount += 1;
+
+      if (question.difficulty === "medium") {
+        user.mediumQuestionsSolved += 1;
+      } else if (question.difficulty === "hard") {
+        user.hardQuestionsSolved += 1;
+      }
+
+      // Award badges for first solve by difficulty
+      const badgesToAward = [];
+      if (
+        question.difficulty === "easy" &&
+        !user.badges.includes("Easy Starter")
+      ) {
+        badgesToAward.push("Easy Starter");
+      }
+
+      if (
+        question.difficulty === "medium" &&
+        !user.badges.includes("Medium Challenger")
+      ) {
+        badgesToAward.push("Medium Challenger");
+      }
+
+      if (
+        question.difficulty === "hard" &&
+        !user.badges.includes("Hard Conqueror")
+      ) {
+        badgesToAward.push("Hard Conqueror");
+      }
+
+      // Update streak logic
+      const today = new Date().toDateString();
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+
+      if (user.lastSolvedDate === yesterday) {
+        user.streakDays += 1;
+      } else if (user.lastSolvedDate !== today) {
+        user.streakDays = 1;
+      }
+
+      user.lastSolvedDate = today;
+
+      // Award streak badges
+      if (user.streakDays >= 7 && !user.badges.includes("7-Day Streak")) {
+        user.badges.push("7-Day Streak");
+      }
+
+      if (user.streakDays >= 30 && !user.badges.includes("30-Day Streak")) {
+        user.badges.push("30-Day Streak");
+      }
+
+      for (let badge of badgesToAward) {
+        user.badges.push(badge);
+      }
+
+      await user.save();
     }
 
-    // Update user stats and badges
-    const user = await User.findById(req.user._id);
-    user.points += pointsEarned;
-    user.solvedQuestionsCount += 1;
-
-    if (question.difficulty === "medium") {
-      user.mediumQuestionsSolved += 1;
-    } else if (question.difficulty === "hard") {
-      user.hardQuestionsSolved += 1;
-    }
-
-    // Award badges for first solve by difficulty
-    const badgesToAward = [];
-    if (
-      question.difficulty === "easy" &&
-      !user.badges.includes("Easy Starter")
-    ) {
-      badgesToAward.push("Easy Starter");
-    }
-
-    if (
-      question.difficulty === "medium" &&
-      !user.badges.includes("Medium Challenger")
-    ) {
-      badgesToAward.push("Medium Challenger");
-    }
-
-    if (
-      question.difficulty === "hard" &&
-      !user.badges.includes("Hard Conqueror")
-    ) {
-      badgesToAward.push("Hard Conqueror");
-    }
-
-    // Update streak logic
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-    if (user.lastSolvedDate === yesterday) {
-      user.streakDays += 1;
-    } else if (user.lastSolvedDate !== today) {
-      user.streakDays = 1; // Reset streak
-    }
-
-    user.lastSolvedDate = today;
-
-    // Award streak badges
-    if (user.streakDays >= 7 && !user.badges.includes("7-Day Streak")) {
-      user.badges.push("7-Day Streak");
-    }
-
-    if (user.streakDays >= 30 && !user.badges.includes("30-Day Streak")) {
-      user.badges.push("30-Day Streak");
-    }
-
-    for (let badge of badgesToAward) {
-      user.badges.push(badge);
-    }
-
-    await user.save();
-
-    // Include pointsEarned and streak information in the response
+    // Send comprehensive response
     res.json({
-      message: "Code executed successfully",
-      result: {
-        status: result.status.description,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        time: result.time,
-        memory: result.memory,
-      },
+      message: allTestCasesPassed
+        ? "All test cases passed!"
+        : "Some test cases failed",
+      success: allTestCasesPassed,
       submission: {
         _id: submission._id,
-        user: submission.user,
-        question: submission.question,
-        code: submission.code,
-        language: submission.language,
         status: submission.status,
-        testCasesPassed: submission.testCasesPassed,
-        testCasesFailed: submission.testCasesFailed,
+        testCasesPassed: passedCount,
+        testCasesFailed: failedCount,
+        totalTestCases: testCaseResults.length,
         pointsEarned,
-        streakDays: user.streakDays,
-        createdAt: submission.createdAt,
+        allTestCasesPassed,
+      },
+      testCaseResults,
+      summary: {
+        totalTestCases: testCaseResults.length,
+        passed: passedCount,
+        failed: failedCount,
+        passPercentage: Math.round(
+          (passedCount / testCaseResults.length) * 100
+        ),
       },
     });
   } catch (error) {
-    // Enhanced error logging
     console.error("❌ Error in runCode:", error);
     console.error("❌ Error stack:", error.stack);
 
-    // Handle different types of errors
     let errorMessage;
     if (typeof error.message === "object") {
       errorMessage = JSON.stringify(error.message);
@@ -237,69 +291,7 @@ export const runCode = async (req, res) => {
 };
 
 export const submitCode = async (req, res) => {
-  const { sourceCode, language, questionId } = req.body;
-
-  try {
-    // Validate required fields
-    if (!sourceCode || !language || !questionId) {
-      return res.status(400).json({
-        message:
-          "Missing required fields: sourceCode, language, and questionId are required",
-      });
-    }
-
-    // Ensure question exists
-    const question = await DSAQuestion.findById(questionId);
-    if (!question) {
-      return res.status(404).json({ message: "DSA Question not found" });
-    }
-
-    // Simulate test case results (replace with actual logic)
-    const totalTestCases = question.testCases.length;
-    const testCasesPassed = Math.floor(Math.random() * totalTestCases);
-    const testCasesFailed = totalTestCases - testCasesPassed;
-
-    // Calculate points (e.g., 10 points per passed test case)
-    const pointsEarned = testCasesPassed * 10;
-
-    // Save submission
-    const submission = await Submission.create({
-      user: req.user._id,
-      question: questionId,
-      code: sourceCode,
-      language,
-      status: testCasesFailed === 0 ? "passed" : "failed",
-      testCasesPassed,
-      testCasesFailed,
-      pointsEarned,
-    });
-
-    // Update user points
-    const user = await User.findById(req.user._id);
-    user.points += pointsEarned;
-    await user.save();
-
-    // Check for badge eligibility
-    const badges = await Badge.find();
-    for (const badge of badges) {
-      if (
-        user.points >= badge.requiredPoints &&
-        !user.badges.includes(badge._id)
-      ) {
-        user.badges.push(badge._id);
-        await user.save();
-      }
-    }
-
-    res.json({
-      message: "Code submitted successfully",
-      submission,
-      user: { points: user.points, badges: user.badges },
-    });
-  } catch (error) {
-    console.error("Error in submitCode:", error);
-    res
-      .status(500)
-      .json({ message: "An error occurred while submitting code" });
-  }
+  // This can be the same as runCode or you can keep it separate
+  // For now, let's just call runCode
+  return runCode(req, res);
 };

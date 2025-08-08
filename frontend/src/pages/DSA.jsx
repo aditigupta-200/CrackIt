@@ -2,7 +2,15 @@ import React, { useState, useEffect } from "react";
 import { getDSAQuestions, addDSAQuestion, runCode } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import Editor from "@monaco-editor/react";
-import { Play, Plus, X } from "lucide-react";
+import {
+  Play,
+  Plus,
+  X,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import Navbar from "../components/Navbar";
 
 const DSA = () => {
@@ -11,7 +19,6 @@ const DSA = () => {
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("javascript");
-  const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
@@ -21,11 +28,8 @@ const DSA = () => {
     tags: "",
     testCases: [{ input: "", expectedOutput: "" }],
   });
-  const [testCaseResults, setTestCaseResults] = useState({
-    passed: 0,
-    failed: 0,
-  });
-  const [pointsEarned, setPointsEarned] = useState(0);
+  const [submissionResult, setSubmissionResult] = useState(null);
+  const [activeTab, setActiveTab] = useState("testcases");
 
   useEffect(() => {
     fetchQuestions();
@@ -44,33 +48,31 @@ const DSA = () => {
     if (!selectedQuestion) return;
 
     setLoading(true);
+    setSubmissionResult(null);
+
     try {
       const response = await runCode({
         sourceCode: code,
         language,
         questionId: selectedQuestion._id,
-        input: "",
       });
 
-      const result = response.data.result;
-      console.log("Judge0 Result:", result);
-      if (result.status.toLowerCase() === "accepted") {
-        setOutput(result.stdout.trim());
-        setTestCaseResults({
-          passed: response.data.submission.testCasesPassed || 0,
-          failed: response.data.submission.testCasesFailed || 0,
-        });
-        setPointsEarned(response.data.submission.pointsEarned || 0);
-      } else {
-        setOutput(result.stderr || "Error occurred");
-        setTestCaseResults({ passed: 0, failed: 0 });
-        setPointsEarned(0);
-      }
+      console.log("Submission response:", response.data);
+      setSubmissionResult(response.data);
+      setActiveTab("testcases");
     } catch (error) {
       console.error("Error details:", error);
-      setOutput(error.response?.data?.message || "Error running code");
-      setTestCaseResults({ passed: 0, failed: 0 });
-      setPointsEarned(0);
+      setSubmissionResult({
+        success: false,
+        message: error.response?.data?.message || "Error running code",
+        testCaseResults: [],
+        submission: {
+          status: "Error",
+          testCasesPassed: 0,
+          testCasesFailed: 0,
+          pointsEarned: 0,
+        },
+      });
     }
     setLoading(false);
   };
@@ -110,6 +112,142 @@ const DSA = () => {
     }
   };
 
+  const getStatusIcon = (status, passed) => {
+    if (status === "timeout") {
+      return <Clock className="w-5 h-5 text-yellow-500" />;
+    } else if (status === "error") {
+      return <AlertCircle className="w-5 h-5 text-red-500" />;
+    } else if (passed) {
+      return <CheckCircle className="w-5 h-5 text-green-500" />;
+    } else {
+      return <XCircle className="w-5 h-5 text-red-500" />;
+    }
+  };
+
+  const getStatusText = (testCase) => {
+    if (testCase.status === "timeout") return "Time Limit Exceeded";
+    if (testCase.status === "error") return "Runtime Error";
+    if (testCase.passed) return "Passed";
+    return "Wrong Answer";
+  };
+
+  const renderTestCaseResults = () => {
+    if (!submissionResult || !submissionResult.testCaseResults) return null;
+
+    return (
+      <div className="space-y-4">
+        {/* Summary */}
+        {submissionResult.summary && (
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold">
+                {submissionResult.success ? (
+                  <span className="text-green-600">
+                    ✅ All Test Cases Passed!
+                  </span>
+                ) : (
+                  <span className="text-red-600">
+                    ❌ Some Test Cases Failed
+                  </span>
+                )}
+              </h3>
+              {submissionResult.submission?.pointsEarned > 0 && (
+                <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                  +{submissionResult.submission.pointsEarned} points
+                </span>
+              )}
+            </div>
+            <div className="flex space-x-4 text-sm text-gray-600">
+              <span>
+                {submissionResult.summary.passed}/
+                {submissionResult.summary.totalTestCases} test cases passed
+              </span>
+              <span>({submissionResult.summary.passPercentage}%)</span>
+            </div>
+          </div>
+        )}
+
+        {/* Individual Test Cases */}
+        <div className="space-y-3">
+          {submissionResult.testCaseResults.map((testCase, index) => (
+            <div
+              key={index}
+              className={`border rounded-lg p-4 ${
+                testCase.passed
+                  ? "border-green-200 bg-green-50"
+                  : "border-red-200 bg-red-50"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  {getStatusIcon(testCase.status, testCase.passed)}
+                  <span className="font-semibold">
+                    Test Case {testCase.testCaseNumber}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      testCase.passed
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {getStatusText(testCase)}
+                  </span>
+                </div>
+                <div className="flex space-x-4 text-sm text-gray-500">
+                  {testCase.executionTime && (
+                    <span>Time: {testCase.executionTime}s</span>
+                  )}
+                  {testCase.memory && (
+                    <span>Memory: {Math.round(testCase.memory / 1024)}KB</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <div className="font-medium text-gray-700 mb-1">Input:</div>
+                  <div className="bg-gray-100 p-2 rounded font-mono text-xs whitespace-pre-wrap">
+                    {testCase.input || "No input"}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-700 mb-1">
+                    Expected Output:
+                  </div>
+                  <div className="bg-gray-100 p-2 rounded font-mono text-xs whitespace-pre-wrap">
+                    {testCase.expectedOutput}
+                  </div>
+                </div>
+                <div>
+                  <div className="font-medium text-gray-700 mb-1">
+                    Your Output:
+                  </div>
+                  <div
+                    className={`p-2 rounded font-mono text-xs whitespace-pre-wrap ${
+                      testCase.passed ? "bg-green-100" : "bg-red-100"
+                    }`}
+                  >
+                    {testCase.actualOutput}
+                  </div>
+                </div>
+              </div>
+
+              {testCase.error && (
+                <div className="mt-3">
+                  <div className="font-medium text-red-700 mb-1">Error:</div>
+                  <div className="bg-red-100 p-2 rounded font-mono text-xs text-red-800">
+                    {testCase.error}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Navbar />
@@ -136,7 +274,10 @@ const DSA = () => {
                 {questions.map((question) => (
                   <div
                     key={question._id}
-                    onClick={() => setSelectedQuestion(question)}
+                    onClick={() => {
+                      setSelectedQuestion(question);
+                      setSubmissionResult(null); // Reset results when changing questions
+                    }}
                     className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
                       selectedQuestion?._id === question._id
                         ? "border-blue-500 bg-blue-50"
@@ -192,14 +333,23 @@ const DSA = () => {
                         <option value="java">Java</option>
                       </select>
 
-                      <button
-                        onClick={handleRunCode}
-                        disabled={loading}
-                        className="flex items-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
-                      >
-                        <Play size={16} className="mr-2" />
-                        {loading ? "Running..." : "Run Code"}
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={handleRunCode}
+                          disabled={loading}
+                          className="flex items-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
+                        >
+                          <Play size={16} className="mr-2" />
+                          {loading ? "Running..." : "Run Code"}
+                        </button>
+                        <button
+                          onClick={handleRunCode}
+                          disabled={loading}
+                          className="flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                        >
+                          Submit
+                        </button>
+                      </div>
                     </div>
 
                     <div className="border rounded mb-4">
@@ -216,33 +366,27 @@ const DSA = () => {
                       />
                     </div>
 
-                    {output && (
-                      <div className="bg-gray-900 text-white p-4 rounded">
-                        <h3 className="font-bold mb-2">Output:</h3>
-                        <pre className="whitespace-pre-wrap">{output}</pre>
-                        <div className="mt-4">
-                          <p className="text-green-400">
-                            Test Cases Passed: {testCaseResults.passed}
-                          </p>
-                          <p className="text-red-400">
-                            Test Cases Failed: {testCaseResults.failed}
-                          </p>
-                          <p className="text-blue-400">
-                            Points Earned: {pointsEarned}
-                          </p>
+                    {/* Results Section */}
+                    {submissionResult && (
+                      <div className="mt-6">
+                        <div className="border-b border-gray-200 mb-4">
+                          <nav className="-mb-px flex space-x-8">
+                            <button
+                              onClick={() => setActiveTab("testcases")}
+                              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                                activeTab === "testcases"
+                                  ? "border-blue-500 text-blue-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                              }`}
+                            >
+                              Test Cases
+                            </button>
+                          </nav>
                         </div>
+
+                        {activeTab === "testcases" && renderTestCaseResults()}
                       </div>
                     )}
-
-                    <div className="flex justify-end mt-4">
-                      <button
-                        onClick={handleRunCode}
-                        disabled={loading}
-                        className="flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-                      >
-                        Submit Code
-                      </button>
-                    </div>
                   </div>
                 </div>
               ) : (
