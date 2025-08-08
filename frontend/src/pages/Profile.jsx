@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { updateProfile } from "../services/api";
+import React, { useEffect, useState } from "react";
+import { updateProfile, getUserProgress } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { User, Mail, Save, Edit2 } from "lucide-react";
 import Navbar from "../components/Navbar";
@@ -13,6 +13,37 @@ const Profile = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [progress, setProgress] = useState({
+    points: 0,
+    badges: [],
+    nextBadge: null,
+    streakDays: 0,
+  });
+  const [submissions, setSubmissions] = useState([]);
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      try {
+        const response = await getUserProgress();
+        setProgress(response.data);
+      } catch (error) {
+        console.error("Error fetching user progress:", error);
+      }
+    };
+    fetchProgress();
+  }, []);
+
+  useEffect(() => {
+    const fetchSubmissions = async () => {
+      try {
+        const response = await getUserProgress();
+        setSubmissions(response.data.submissions || []);
+      } catch (error) {
+        console.error("Error fetching submissions:", error);
+      }
+    };
+    fetchSubmissions();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,7 +51,7 @@ const Profile = () => {
     setMessage("");
 
     try {
-      const response = await updateProfile(formData);
+      await updateProfile(formData);
 
       // Update user context with new data
       const updatedUser = { ...user, ...formData };
@@ -216,6 +247,89 @@ const Profile = () => {
                 <span className="font-mono text-xs">{user?._id}</span>
               </div>
             </div>
+          </div>
+
+          {/* Points Progress */}
+          <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold mb-4">Points Progress</h3>
+            <div className="relative w-full h-4 bg-gray-200 rounded-full">
+              <div
+                className="absolute top-0 left-0 h-4 bg-blue-600 rounded-full"
+                style={{
+                  width: `${
+                    (progress.points /
+                      (progress.nextBadge?.requiredPoints || 1)) *
+                    100
+                  }%`,
+                }}
+              ></div>
+            </div>
+            <p className="mt-2 text-sm text-gray-600">
+              {progress.points} / {progress.nextBadge?.requiredPoints || "N/A"}{" "}
+              points to next badge
+            </p>
+          </div>
+
+          {/* Badges Section */}
+          <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold mb-4">Badges</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {progress.badges.map((badge) => (
+                <div
+                  key={badge._id}
+                  className={`text-center p-4 rounded ${
+                    badge.earned ? "bg-green-50" : "bg-gray-50"
+                  }`}
+                >
+                  <div
+                    className={`text-2xl font-bold ${
+                      badge.earned ? "text-green-600" : "text-gray-600"
+                    }`}
+                  >
+                    {badge.name}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {badge.description}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {badge.requiredPoints} points required
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Submissions Section */}
+          <div className="mt-6 bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-xl font-bold mb-4">Submissions</h3>
+            {submissions.length > 0 ? (
+              <ul className="space-y-2">
+                {submissions.map((submission) => (
+                  <li
+                    key={submission._id}
+                    className="p-3 border rounded bg-gray-50 hover:bg-gray-100"
+                  >
+                    <div className="flex justify-between">
+                      <span className="font-semibold">
+                        {submission.questionTitle}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {new Date(submission.date).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Test Cases Passed: {submission.testCasesPassed} /{" "}
+                      {submission.testCasesTotal}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      Points Earned: {submission.pointsEarned}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-500">No submissions yet.</p>
+            )}
           </div>
         </div>
       </div>

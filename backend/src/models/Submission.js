@@ -19,6 +19,9 @@ const submissionSchema = new mongoose.Schema({
   time: { type: String }, // Execution time
   memory: { type: String }, // Memory used
   createdAt: { type: Date, default: Date.now },
+  testCasesPassed: { type: Number, required: true },
+  testCasesFailed: { type: Number, required: true },
+  pointsEarned: { type: Number, default: 0 },
 });
 
 export default mongoose.model("Submission", submissionSchema);

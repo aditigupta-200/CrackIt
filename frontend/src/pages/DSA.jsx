@@ -21,6 +21,11 @@ const DSA = () => {
     tags: "",
     testCases: [{ input: "", expectedOutput: "" }],
   });
+  const [testCaseResults, setTestCaseResults] = useState({
+    passed: 0,
+    failed: 0,
+  });
+  const [pointsEarned, setPointsEarned] = useState(0);
 
   useEffect(() => {
     fetchQuestions();
@@ -51,12 +56,21 @@ const DSA = () => {
       console.log("Judge0 Result:", result);
       if (result.status.toLowerCase() === "accepted") {
         setOutput(result.stdout.trim());
+        setTestCaseResults({
+          passed: response.data.submission.testCasesPassed || 0,
+          failed: response.data.submission.testCasesFailed || 0,
+        });
+        setPointsEarned(response.data.submission.pointsEarned || 0);
       } else {
         setOutput(result.stderr || "Error occurred");
+        setTestCaseResults({ passed: 0, failed: 0 });
+        setPointsEarned(0);
       }
     } catch (error) {
       console.error("Error details:", error);
       setOutput(error.response?.data?.message || "Error running code");
+      setTestCaseResults({ passed: 0, failed: 0 });
+      setPointsEarned(0);
     }
     setLoading(false);
   };
@@ -206,8 +220,29 @@ const DSA = () => {
                       <div className="bg-gray-900 text-white p-4 rounded">
                         <h3 className="font-bold mb-2">Output:</h3>
                         <pre className="whitespace-pre-wrap">{output}</pre>
+                        <div className="mt-4">
+                          <p className="text-green-400">
+                            Test Cases Passed: {testCaseResults.passed}
+                          </p>
+                          <p className="text-red-400">
+                            Test Cases Failed: {testCaseResults.failed}
+                          </p>
+                          <p className="text-blue-400">
+                            Points Earned: {pointsEarned}
+                          </p>
+                        </div>
                       </div>
                     )}
+
+                    <div className="flex justify-end mt-4">
+                      <button
+                        onClick={handleRunCode}
+                        disabled={loading}
+                        className="flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                      >
+                        Submit Code
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

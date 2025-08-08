@@ -10,13 +10,14 @@ const userSchema = new mongoose.Schema({
     enum: ["candidate", "interviewer", "super_admin"],
     default: "candidate",
   },
-  badges: [{ type: mongoose.Schema.Types.ObjectId, ref: "UserBadge" }],
+  badges: [{ type: String }], // Updated to store badge names as strings
   streak: {
     daily: { type: Number, default: 0 },
     lastActiveDate: { type: Date, default: null },
   },
   questionsSolved: { type: Number, default: 0 },
   achievements: [{ type: String }], // e.g., offers, completed interviews
+  points: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 

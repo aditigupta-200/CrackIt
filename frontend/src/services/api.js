@@ -43,3 +43,4 @@ export const getNotifications = () => API.get("/notifications");
 export const getAllUsers = () => API.get("/super-admin/users");
 export const createAdmin = (data) =>
   API.post("/super-admin/create-admin", data);
+export const getUserProgress = () => API.get("/users/progress");
