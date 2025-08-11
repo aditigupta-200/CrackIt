@@ -20,6 +20,11 @@ export const login = (data) => API.post("/auth/login", data);
 export const logout = () => API.post("/auth/logout");
 export const updateProfile = (data) => API.put("/auth/update-profile", data);
 
+
+// User Profile & Progress - Fixed endpoints
+export const getUserProfile = () => API.get("/auth/profile");
+export const getUserProgress = () => API.get("/auth/progress")
+
 // DSA
 export const getDSAQuestions = () => API.get("/dsa");
 export const addDSAQuestion = (data) => API.post("/dsa", data);
@@ -41,6 +46,5 @@ export const getNotifications = () => API.get("/notifications");
 
 // Super Admin
 export const getAllUsers = () => API.get("/super-admin/users");
-export const createAdmin = (data) =>
-  API.post("/super-admin/create-admin", data);
-export const getUserProgress = () => API.get("/users/progress");
+export const createAdmin = (data) => API.post("/super-admin/create-admin", data);
+// export const getUserProgress = () => API.get("/users/progress");

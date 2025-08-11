@@ -10,14 +10,21 @@ const userSchema = new mongoose.Schema({
     enum: ["candidate", "interviewer", "super_admin"],
     default: "candidate",
   },
-  badges: [{ type: String }], // Updated to store badge names as strings
+  badges: [{ type: String }], // Badge names as strings
   streak: {
     daily: { type: Number, default: 0 },
     lastActiveDate: { type: Date, default: null },
   },
-  questionsSolved: { type: Number, default: 0 },
-  achievements: [{ type: String }], // e.g., offers, completed interviews
+  // Add these missing fields that are used in submission controller
   points: { type: Number, default: 0 },
+  solvedQuestionsCount: { type: Number, default: 0 },
+  mediumQuestionsSolved: { type: Number, default: 0 },
+  hardQuestionsSolved: { type: Number, default: 0 },
+  streakDays: { type: Number, default: 0 },
+  lastSolvedDate: { type: String }, // Store as string for date comparison
+
+  questionsSolved: { type: Number, default: 0 }, // Keep for backward compatibility
+  achievements: [{ type: String }], // e.g., offers, completed interviews
   createdAt: { type: Date, default: Date.now },
 });
 

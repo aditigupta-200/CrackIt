@@ -5,6 +5,8 @@ import {
   login,
   logout,
   updateProfile,
+  getUserProfile,
+  getUserProgress,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import User from "../models/User.js"; // Import the User model
@@ -15,7 +17,13 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
 router.put("/update-profile", verifyJWT, updateProfile); // Protected route for all authenticated users
-router.get("/profile", verifyJWT, async (req, res) => {
+router.get("/profile", verifyJWT, getUserProfile);
+
+// New progress route
+router.get("/progress", verifyJWT, getUserProgress);
+
+// Keep the old simple profile route for backward compatibility
+router.get("/profile-simple", verifyJWT, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
     if (!user) {

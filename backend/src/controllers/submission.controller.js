@@ -185,6 +185,7 @@ export const runCode = async (req, res) => {
       const user = await User.findById(req.user._id);
       user.points += pointsEarned;
       user.solvedQuestionsCount += 1;
+      user.questionsSolved += 1;
 
       if (question.difficulty === "medium") {
         user.mediumQuestionsSolved += 1;
@@ -221,26 +222,36 @@ export const runCode = async (req, res) => {
 
       if (user.lastSolvedDate === yesterday) {
         user.streakDays += 1;
+        user.streak.daily += 1;
       } else if (user.lastSolvedDate !== today) {
         user.streakDays = 1;
+        user.streak.daily = 1;
       }
 
       user.lastSolvedDate = today;
+      user.streak.lastActiveDate = new Date();
 
       // Award streak badges
       if (user.streakDays >= 7 && !user.badges.includes("7-Day Streak")) {
         user.badges.push("7-Day Streak");
+        badgesToAward.push("7-Day Streak");
       }
 
       if (user.streakDays >= 30 && !user.badges.includes("30-Day Streak")) {
         user.badges.push("30-Day Streak");
+        badgesToAward.push("30-Day Streak");
       }
 
       for (let badge of badgesToAward) {
-        user.badges.push(badge);
+        if (!user.badges.includes(badge)) {
+          user.badges.push(badge);
+        }
       }
 
       await user.save();
+        console.log(
+          `✅ User stats updated: Points: ${user.points}, Badges: ${user.badges.length}`
+        );
     }
 
     // Send comprehensive response

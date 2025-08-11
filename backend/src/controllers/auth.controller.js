@@ -4,7 +4,8 @@ import User from "../models/User.js";
 import generateToken from "../utils/generateToken.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
-import BlacklistedToken from "../models/BlacklistedToken.js";
+import Submission from "../models/Submission.js";
+import DSAQuestion from "../models/DSAQuestion.js";
 
 export const register = asyncHandler(async (req, res) => {
   const { username, email, password, role } = req.body;
@@ -58,14 +59,7 @@ export const logout = asyncHandler(async (req, res) => {
   res.json({ message: "Logged out successfully" });
 });
 
-// export const logoutUser = async (req, res) => {
-//   try {
-//     await BlacklistedToken.create({ token, expiresAt });
-//     res.json({ message: "Logged out successfully" });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
+
 
 export const updateProfile = asyncHandler(async (req, res) => {
   const userId = req.user._id;
@@ -150,4 +144,130 @@ export const updateProfile = asyncHandler(async (req, res) => {
     user: updatedUser,
     updatedFields: Object.keys(filteredUpdateData),
   });
+});
+
+
+export const getUserProfile = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get recent submissions
+    const recentSubmissions = await Submission.find({ user: req.user._id })
+      .populate("question", "title difficulty")
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    // Format submissions for frontend
+    const formattedSubmissions = recentSubmissions.map((submission) => ({
+      _id: submission._id,
+      questionTitle: submission.question.title,
+      status: submission.status,
+      testCasesPassed: submission.testCasesPassed,
+      testCasesFailed: submission.testCasesFailed,
+      testCasesTotal: submission.testCasesPassed + submission.testCasesFailed,
+      pointsEarned: submission.pointsEarned,
+      date: submission.createdAt,
+      language: submission.language,
+    }));
+
+    // Calculate total points from submissions (in case user.points is out of sync)
+    const totalPointsFromSubmissions = await Submission.aggregate([
+      { $match: { user: req.user._id, status: "Accepted" } },
+      { $group: { _id: null, totalPoints: { $sum: "$pointsEarned" } } },
+    ]);
+
+    const calculatedPoints = totalPointsFromSubmissions[0]?.totalPoints || 0;
+
+    // Update user points if they're out of sync
+    if (user.points !== calculatedPoints) {
+      await User.findByIdAndUpdate(req.user._id, { points: calculatedPoints });
+      user.points = calculatedPoints;
+    }
+
+    res.json({
+      user,
+      submissions: formattedSubmissions,
+      stats: {
+        totalSubmissions: recentSubmissions.length,
+        acceptedSubmissions: recentSubmissions.filter(
+          (s) => s.status === "Accepted"
+        ).length,
+        totalPoints: user.points,
+        badges: user.badges || [],
+        streak: user.streakDays || 0,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Add this function to get user progress/stats
+export const getUserProgress = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Get all badges (you might want to create actual Badge documents)
+    const availableBadges = [
+      {
+        _id: "easy_starter",
+        name: "Easy Starter",
+        description: "Solve your first easy problem",
+        requiredPoints: 5,
+        earned: user.badges.includes("Easy Starter"),
+      },
+      {
+        _id: "medium_challenger",
+        name: "Medium Challenger",
+        description: "Solve your first medium problem",
+        requiredPoints: 10,
+        earned: user.badges.includes("Medium Challenger"),
+      },
+      {
+        _id: "hard_conqueror",
+        name: "Hard Conqueror",
+        description: "Solve your first hard problem",
+        requiredPoints: 20,
+        earned: user.badges.includes("Hard Conqueror"),
+      },
+      {
+        _id: "week_streak",
+        name: "7-Day Streak",
+        description: "Maintain a 7-day solving streak",
+        requiredPoints: 35,
+        earned: user.badges.includes("7-Day Streak"),
+      },
+      {
+        _id: "month_streak",
+        name: "30-Day Streak",
+        description: "Maintain a 30-day solving streak",
+        requiredPoints: 150,
+        earned: user.badges.includes("30-Day Streak"),
+      },
+    ];
+
+    // Find next badge to earn
+    const unearned = availableBadges.filter((badge) => !badge.earned);
+    const nextBadge = unearned.sort(
+      (a, b) => a.requiredPoints - b.requiredPoints
+    )[0];
+
+    res.json({
+      points: user.points || 0,
+      badges: availableBadges,
+      nextBadge,
+      streakDays: user.streakDays || 0,
+      solvedQuestionsCount: user.solvedQuestionsCount || 0,
+      mediumQuestionsSolved: user.mediumQuestionsSolved || 0,
+      hardQuestionsSolved: user.hardQuestionsSolved || 0,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 });
