@@ -210,12 +210,30 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 
 // Improved getUserActivities with better user-wise formatting
 export const getUserActivities = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, role, activity } = req.query;
+  const { page = 1, limit = 20, role, activity, search } = req.query;
+
+  // Build match conditions
+  const matchConditions = {};
+
+  // Filter by role if specified
+  if (role) {
+    matchConditions.role = role;
+  }
+
+  // Filter by search term (username or email)
+  if (search) {
+    matchConditions.$or = [
+      { username: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+    ];
+  }
 
   // Get activities grouped by user
   const userActivities = await User.aggregate([
-    // Filter by role if specified
-    ...(role ? [{ $match: { role } }] : []),
+    // Apply filters
+    ...(Object.keys(matchConditions).length > 0
+      ? [{ $match: matchConditions }]
+      : []),
 
     // Get user submissions
     {

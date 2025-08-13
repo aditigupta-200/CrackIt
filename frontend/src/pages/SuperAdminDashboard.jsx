@@ -67,6 +67,7 @@ const SuperAdminDashboard = () => {
           limit: 20,
           role: filters.role,
           activity: filters.activity,
+          search: filters.search,
         }),
       ]);
 
@@ -88,7 +89,7 @@ const SuperAdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters.role, filters.activity]);
+  }, [filters.role, filters.activity, filters.search]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -158,6 +159,14 @@ const SuperAdminDashboard = () => {
       user.username.toLowerCase().includes(filters.search.toLowerCase()) ||
       user.email.toLowerCase().includes(filters.search.toLowerCase());
     return matchesRole && matchesSearch;
+  });
+
+  const filteredActivities = activities.filter((user) => {
+    const matchesSearch =
+      !filters.search ||
+      user.username?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      user.email?.toLowerCase().includes(filters.search.toLowerCase());
+    return matchesSearch;
   });
 
   return (
@@ -477,7 +486,20 @@ const SuperAdminDashboard = () => {
                 {/* Filter Controls */}
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                   <div className="flex flex-col sm:flex-row gap-4">
-                    
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search users..."
+                          className="pl-10 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={filters.search}
+                          onChange={(e) =>
+                            setFilters({ ...filters, search: e.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
                     <select
                       className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={filters.role}
@@ -505,7 +527,7 @@ const SuperAdminDashboard = () => {
 
                 {/* User Activities List */}
                 <div className="space-y-4">
-                  {activities.map((user) => (
+                  {filteredActivities.map((user) => (
                     <div
                       key={user._id}
                       className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
