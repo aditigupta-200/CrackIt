@@ -12,6 +12,7 @@ import submissionRoutes from "./routes/submission.route.js";
 import badgeRoutes from "./routes/badge.route.js";
 import interviewRoutes from "./routes/interview.route.js";
 import notificationRoutes from "./routes/notification.route.js";
+import superAdminRoutes from "./routes/superAdmin.route.js";
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,7 @@ app.use("/api/submissions", submissionRoutes);
 app.use("/api/badges", badgeRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/super-admin", superAdminRoutes);
 
 // Default Route
 app.get("/", (req, res) => {

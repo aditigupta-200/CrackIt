@@ -3,9 +3,24 @@ import {
   updateProfile,
   getUserProgress,
   getUserProfile,
+  getDashboardStats,
 } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { User, Mail, Save, Edit2, Trophy, Target, Zap } from "lucide-react";
+import {
+  User,
+  Mail,
+  Save,
+  Edit2,
+  Trophy,
+  Target,
+  Zap,
+  Shield,
+  Users,
+  Activity,
+  Code,
+  Calendar,
+  Settings,
+} from "lucide-react";
 import Navbar from "../components/Navbar";
 
 const Profile = () => {
@@ -28,28 +43,36 @@ const Profile = () => {
   });
   const [profileData, setProfileData] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [adminStats, setAdminStats] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [progressRes, profileRes] = await Promise.all([
-          getUserProgress(),
-          getUserProfile(),
-        ]);
-
-        setProgress(progressRes.data);
-        setProfileData(profileRes.data);
-        setSubmissions(profileRes.data.submissions || []);
-
-        console.log("Progress data:", progressRes.data);
-        console.log("Profile data:", profileRes.data);
+        if (user?.role === "super_admin") {
+          // Fetch admin-specific data
+          const [profileRes, statsRes] = await Promise.all([
+            getUserProfile(),
+            getDashboardStats(),
+          ]);
+          setProfileData(profileRes.data);
+          setAdminStats(statsRes.data);
+        } else {
+          // Fetch regular user data
+          const [progressRes, profileRes] = await Promise.all([
+            getUserProgress(),
+            getUserProfile(),
+          ]);
+          setProgress(progressRes.data);
+          setProfileData(profileRes.data);
+          setSubmissions(profileRes.data.submissions || []);
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
 
     fetchData();
-  }, []);
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -94,6 +117,365 @@ const Profile = () => {
 
   const currentUser = profileData?.user || user;
 
+  // Super Admin Profile View
+  if (user?.role === "super_admin") {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gray-50 p-6">
+          <div className="container mx-auto max-w-6xl">
+            <h1 className="text-3xl font-bold mb-6">Super Admin Profile</h1>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Profile Info */}
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                  {/* Profile Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center space-x-4">
+                      <div className="bg-red-100 p-4 rounded-full">
+                        <Shield size={32} className="text-red-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold">
+                          {currentUser?.username}
+                        </h2>
+                        <p className="text-red-600 font-medium">
+                          Super Administrator
+                        </p>
+                        <div className="flex items-center mt-2 text-sm text-gray-500">
+                          <Settings size={16} className="mr-1" />
+                          Full Platform Access
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isEditing && (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Edit2 size={16} className="mr-2" />
+                        Edit Profile
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Success/Error Message */}
+                  {message && (
+                    <div
+                      className={`p-3 rounded-lg mb-4 ${
+                        message.includes("successfully")
+                          ? "bg-green-100 text-green-700 border border-green-200"
+                          : "bg-red-100 text-red-700 border border-red-200"
+                      }`}
+                    >
+                      {message}
+                    </div>
+                  )}
+
+                  {/* Profile Form */}
+                  <form onSubmit={handleSubmit}>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-700 mb-2 font-medium">
+                          <User size={16} className="inline mr-2" />
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          className={`w-full p-3 border rounded-lg ${
+                            isEditing
+                              ? "bg-white border-gray-300 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                              : "bg-gray-50 border-gray-200"
+                          } transition-colors`}
+                          value={formData.username}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              username: e.target.value,
+                            })
+                          }
+                          disabled={!isEditing}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-700 mb-2 font-medium">
+                          <Mail size={16} className="inline mr-2" />
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          className={`w-full p-3 border rounded-lg ${
+                            isEditing
+                              ? "bg-white border-gray-300 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                              : "bg-gray-50 border-gray-200"
+                          } transition-colors`}
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                          disabled={!isEditing}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-700 mb-2 font-medium">
+                          Administrative Role
+                        </label>
+                        <div className="flex items-center p-3 bg-red-50 border-2 border-red-200 rounded-lg">
+                          <Shield size={20} className="text-red-600 mr-2" />
+                          <span className="text-red-700 font-medium">
+                            Super Administrator
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          You have complete administrative control over the
+                          platform, including user management, role assignments,
+                          and system restrictions.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Form Actions */}
+                    {isEditing && (
+                      <div className="flex justify-end space-x-4 mt-6">
+                        <button
+                          type="button"
+                          onClick={handleCancel}
+                          className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                        >
+                          <Save size={16} className="mr-2" />
+                          {loading ? "Saving..." : "Save Changes"}
+                        </button>
+                      </div>
+                    )}
+                  </form>
+                </div>
+
+                {/* Admin Privileges */}
+                <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                  <h3 className="text-xl font-bold mb-4 flex items-center">
+                    <Settings size={20} className="mr-2 text-red-600" />
+                    Administrative Privileges
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                      <Users size={18} className="text-green-600 mr-3" />
+                      <div>
+                        <div className="font-semibold text-green-800">
+                          User Management
+                        </div>
+                        <div className="text-sm text-green-600">
+                          Create, edit, and manage all users
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <Shield size={18} className="text-blue-600 mr-3" />
+                      <div>
+                        <div className="font-semibold text-blue-800">
+                          Role Assignment
+                        </div>
+                        <div className="text-sm text-blue-600">
+                          Modify user roles and permissions
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <Activity size={18} className="text-purple-600 mr-3" />
+                      <div>
+                        <div className="font-semibold text-purple-800">
+                          Activity Monitor
+                        </div>
+                        <div className="text-sm text-purple-600">
+                          View all user activities and submissions
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <Settings size={18} className="text-orange-600 mr-3" />
+                      <div>
+                        <div className="font-semibold text-orange-800">
+                          System Control
+                        </div>
+                        <div className="text-sm text-orange-600">
+                          Restrict users and manage platform features
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account Information */}
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-xl font-bold mb-4">
+                    Account Information
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-gray-600">
+                        Administrator since:
+                      </span>
+                      <span className="font-medium">
+                        {new Date(currentUser?.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-gray-600">Last login:</span>
+                      <span className="font-medium">
+                        {currentUser?.lastLogin
+                          ? new Date(currentUser.lastLogin).toLocaleDateString()
+                          : "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-gray-600">Access Level:</span>
+                      <span className="font-medium text-red-600">Maximum</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Account ID:</span>
+                      <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                        {currentUser?._id}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Platform Stats */}
+              <div className="space-y-6">
+                {adminStats && (
+                  <>
+                    {/* Platform Overview */}
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-xl font-bold mb-4 flex items-center">
+                        <Activity size={20} className="mr-2 text-blue-600" />
+                        Platform Overview
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                          <div className="flex items-center">
+                            <Users className="text-blue-600 mr-2" size={20} />
+                            <span className="text-gray-700">Total Users</span>
+                          </div>
+                          <span className="text-xl font-bold text-blue-600">
+                            {adminStats.users?.total || 0}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                          <div className="flex items-center">
+                            <Code className="text-green-600 mr-2" size={20} />
+                            <span className="text-gray-700">
+                              Total Submissions
+                            </span>
+                          </div>
+                          <span className="text-xl font-bold text-green-600">
+                            {adminStats.submissions?.total || 0}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                          <div className="flex items-center">
+                            <Calendar
+                              className="text-purple-600 mr-2"
+                              size={20}
+                            />
+                            <span className="text-gray-700">
+                              Total Interviews
+                            </span>
+                          </div>
+                          <span className="text-xl font-bold text-purple-600">
+                            {adminStats.interviews?.total || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* User Distribution */}
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-lg font-bold mb-3">User Roles</h3>
+                      <div className="space-y-3">
+                        {Object.entries(adminStats.users?.byRole || {}).map(
+                          ([role, count]) => (
+                            <div
+                              key={role}
+                              className="flex items-center justify-between"
+                            >
+                              <div className="flex items-center">
+                                <div
+                                  className={`w-3 h-3 rounded-full mr-3 ${
+                                    role === "super_admin"
+                                      ? "bg-red-500"
+                                      : role === "interviewer"
+                                      ? "bg-blue-500"
+                                      : "bg-green-500"
+                                  }`}
+                                ></div>
+                                <span className="text-gray-700 capitalize">
+                                  {role.replace("_", " ")}
+                                </span>
+                              </div>
+                              <span className="font-semibold">{count}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Recent Activity Summary */}
+                    <div className="bg-white rounded-xl shadow-sm border p-6">
+                      <h3 className="text-lg font-bold mb-3">
+                        Recent Activity
+                      </h3>
+                      <div className="space-y-3 text-sm">
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-600">Last 7 days:</span>
+                          <span className="font-medium">
+                            {adminStats.submissions?.recent || 0} submissions
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-600">Success Rate:</span>
+                          <span className="font-medium text-green-600">
+                            {adminStats.submissions?.successRate || 0}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between py-2">
+                          <span className="text-gray-600">
+                            Completed Interviews:
+                          </span>
+                          <span className="font-medium">
+                            {adminStats.interviews?.completed || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Regular User Profile View (existing code)
   return (
     <>
       <Navbar />

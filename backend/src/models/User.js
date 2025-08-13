@@ -25,6 +25,17 @@ const userSchema = new mongoose.Schema({
 
   questionsSolved: { type: Number, default: 0 }, // Keep for backward compatibility
   achievements: [{ type: String }], // e.g., offers, completed interviews
+
+  // Super Admin features
+  restrictions: {
+    canSubmitCode: { type: Boolean, default: true },
+    canApplyForInterviews: { type: Boolean, default: true },
+    canCreateInterviews: { type: Boolean, default: true },
+    canViewBadges: { type: Boolean, default: true },
+    restrictionReason: { type: String, default: "" },
+  },
+  restrictedAt: { type: Date },
+
   createdAt: { type: Date, default: Date.now },
 });
 
