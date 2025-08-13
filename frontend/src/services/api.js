@@ -1,82 +1,8 @@
-// import axios from "axios";
-// import Cookies from "js-cookie";
-
-// const API = axios.create({
-//   baseURL: "http://localhost:5000/api",
-//   withCredentials: true,
-// });
-
-// API.interceptors.request.use((config) => {
-//   const token = Cookies.get("accessToken") || localStorage.getItem("token");
-//   console.log(
-//     "API Request:",
-//     config.url,
-//     "Token:",
-//     token ? "Present" : "Missing"
-//   );
-//   if (token) {
-//     config.headers.Authorization = `Bearer ${token}`;
-//   }
-//   return config;
-// });
-
-// API.interceptors.response.use(
-//   (response) => response,
-//   (error) => {
-//     console.error("API Error:", error.response?.data || error.message);
-//     return Promise.reject(error);
-//   }
-// );
-
-// // Auth
-// export const register = (data) => API.post("/auth/register", data);
-// export const login = (data) => API.post("/auth/login", data);
-// export const logout = () => API.post("/auth/logout");
-// export const updateProfile = (data) => API.put("/auth/update-profile", data);
-
-// // User Profile & Progress - Fixed endpoints
-// export const getUserProfile = () => API.get("/auth/profile");
-// export const getUserProgress = () => API.get("/auth/progress");
-
-// // DSA
-// export const getDSAQuestions = () => API.get("/dsa");
-// export const addDSAQuestion = (data) => API.post("/dsa", data);
-
-// // Submissions
-// export const runCode = (data) => API.post("/submissions/run", data);
-
-// // Interviews
-// export const getInterviews = () => API.get("/interviews");
-// export const createInterview = (data) => API.post("/interviews", data);
-// export const applyForInterview = (data) => API.post("/interviews/apply", data);
-
-// // Badges
-// export const getUserBadges = () => API.get("/badges/my");
-// export const createBadge = (data) => API.post("/badges", data);
-
-// // Notifications
-// export const getNotifications = () => API.get("/notifications");
-
-// // Super Admin
-// export const getAllUsers = () => API.get("/super-admin/users");
-// export const getDashboardStats = () => API.get("/super-admin/stats");
-// export const getUserActivities = (params) =>
-//   API.get("/super-admin/activities", { params });
-// export const getUserDetails = (userId) =>
-//   API.get(`/super-admin/users/${userId}`);
-// export const updateUserRole = (userId, role) =>
-//   API.put(`/super-admin/users/${userId}/role`, { role });
-// export const restrictUser = (userId, restrictions) =>
-//   API.put(`/super-admin/users/${userId}/restrict`, { restrictions });
-// // export const getUserProgress = () => API.get("/users/progress");
-
-
-
 import axios from "axios";
 import Cookies from "js-cookie";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://crackit-final.onrender.com/api",
   withCredentials: true,
 });
 
