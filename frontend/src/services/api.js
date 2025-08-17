@@ -2,13 +2,18 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const API = axios.create({
-  baseURL: "https://crackit-final.onrender.com/api",
+  baseURL: "https://crackit-final.onrender.com/api", // Production backend
   withCredentials: true,
 });
 
 API.interceptors.request.use((config) => {
   const token = Cookies.get("accessToken") || localStorage.getItem("token");
-  console.log("API Request:", config.url, "Token:", token ? "Present" : "Missing");
+  console.log(
+    "API Request:",
+    config.url,
+    "Token:",
+    token ? "Present" : "Missing"
+  );
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -28,6 +33,7 @@ export const register = (data) => API.post("/auth/register", data);
 export const login = (data) => API.post("/auth/login", data);
 export const logout = () => API.post("/auth/logout");
 export const updateProfile = (data) => API.put("/auth/update-profile", data);
+export const googleLogin = (data) => API.post("/auth/google", data);
 
 // User Profile & Progress - Fixed endpoints
 export const getUserProfile = () => API.get("/auth/profile");

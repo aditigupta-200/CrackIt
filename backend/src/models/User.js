@@ -10,6 +10,11 @@ const userSchema = new mongoose.Schema({
     enum: ["candidate", "interviewer", "super_admin"],
     default: "candidate",
   },
+
+  // Google Auth fields
+  googleId: { type: String, unique: true, sparse: true },
+  profilePicture: { type: String },
+
   badges: [{ type: String }], // Badge names as strings
   streak: {
     daily: { type: Number, default: 0 },

@@ -67,6 +67,45 @@ const Dashboard = () => {
 
   const earnedBadges = userProgress.badges.filter((badge) => badge.earned);
 
+  // Calculate progress based on questions solved and difficulty
+  const calculateProgress = () => {
+    const totalQuestions = stats.questions;
+    const solvedQuestions = userProgress.solvedQuestionsCount || 0;
+
+    if (totalQuestions === 0) return 0;
+
+    // If we have difficulty breakdown, use weighted calculation
+    if (userProgress.difficultyBreakdown) {
+      const {
+        easy = 0,
+        medium = 0,
+        hard = 0,
+      } = userProgress.difficultyBreakdown;
+
+      // Weight: Easy = 1, Medium = 2, Hard = 3
+      const weightedScore = easy * 1 + medium * 2 + hard * 3;
+      const maxPossibleScore = totalQuestions * 2; // Assuming average difficulty is medium
+
+      return Math.min(
+        Math.round((weightedScore / maxPossibleScore) * 100),
+        100
+      );
+    }
+
+    // Basic progress percentage (fallback when no difficulty breakdown available)
+    const basicProgress = Math.round((solvedQuestions / totalQuestions) * 100);
+    return Math.min(basicProgress, 100);
+  };
+
+  const progressPercentage = calculateProgress();
+
+  // Calculate displayed solved questions count
+  const getDisplayedSolvedCount = () => {
+    return userProgress.solvedQuestionsCount || 0;
+  };
+
+  const displayedSolvedCount = getDisplayedSolvedCount();
+
   return (
     <>
       <Navbar />
@@ -171,15 +210,12 @@ const Dashboard = () => {
             <div className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-500">Progress</p>
+                  <p className="text-gray-500">Overall Progress</p>
                   <p className="text-2xl font-bold text-indigo-600">
-                    {userProgress.points > 0
-                      ? Math.round(
-                          (earnedBadges.length / userProgress.badges.length) *
-                            100
-                        )
-                      : 0}
-                    %
+                    {progressPercentage}%
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {displayedSolvedCount} / {stats.questions} problems
                   </p>
                 </div>
                 <TrendingUp className="text-indigo-500" size={32} />

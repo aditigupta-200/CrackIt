@@ -1,13 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { login as loginAPI, register as registerAPI } from "../services/api";
+import { useGoogleAuth } from "../hooks/useGoogleAuth";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const { loginUser } = useAuth();
+  const { renderGoogleButton } = useGoogleAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Render Google button when component mounts
+    const timer = setTimeout(() => {
+      renderGoogleButton("google-signin-button");
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [renderGoogleButton]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +36,18 @@ const Login = () => {
       <div className="bg-white p-8 rounded-lg shadow-md w-96">
         <h2 className="text-2xl font-bold mb-6">Login</h2>
         {error && <div className="text-red-500 mb-4">{error}</div>}
+
+        {/* Google Sign-In Button */}
+        <div className="mb-4">
+          <div id="google-signin-button" className="w-full"></div>
+        </div>
+
+        <div className="flex items-center my-4">
+          <hr className="flex-1 border-gray-300" />
+          <span className="px-3 text-gray-500 text-sm">or</span>
+          <hr className="flex-1 border-gray-300" />
+        </div>
+
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-gray-700 mb-2">Email</label>
@@ -54,7 +77,7 @@ const Login = () => {
             type="submit"
             className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
           >
-            Login
+            Login with Email
           </button>
         </form>
         <p className="mt-4 text-center">

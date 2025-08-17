@@ -7,6 +7,7 @@ import {
   updateProfile,
   getUserProfile,
   getUserProgress,
+  googleAuth,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import User from "../models/User.js"; // Import the User model
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post("/register", register);
 router.post("/login", login);
 router.post("/logout", logout);
+router.post("/google", googleAuth); // Add Google auth route
 router.put("/update-profile", verifyJWT, updateProfile); // Protected route for all authenticated users
 router.get("/profile", verifyJWT, getUserProfile);
 
