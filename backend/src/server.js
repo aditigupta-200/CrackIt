@@ -38,6 +38,14 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   })
 );
+
+// Additional headers for Google OAuth
+app.use((req, res, next) => {
+  res.header("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.header("Cross-Origin-Embedder-Policy", "unsafe-none");
+  next();
+});
+
 app.use(morgan("dev"));
 app.use(cookieParser());
 

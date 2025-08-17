@@ -6,28 +6,48 @@ import { googleLogin } from "../services/api";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export const useGoogleAuth = () => {
-  const { login } = useAuth();
+  const { loginUser } = useAuth(); // Use loginUser instead of login
 
   const handleCredentialResponse = useCallback(
     async (response) => {
       try {
+        console.log(
+          "Google credential received:",
+          response.credential ? "Yes" : "No"
+        );
+
         // Send the credential to your backend using API service
         const result = await googleLogin({
           credential: response.credential,
         });
 
+        console.log("Backend response:", result.data);
+
         if (result.data.success) {
           // Use your existing login function
-          login(result.data.user, result.data.token);
+          loginUser(result.data.user, result.data.token);
+          console.log("User logged in successfully");
+          // Redirect to dashboard
+          window.location.href = "/dashboard";
         } else {
           throw new Error(result.data.message || "Google login failed");
         }
       } catch (error) {
         console.error("Google login error:", error);
-        alert("Google login failed. Please try again.");
+
+        // More specific error messages
+        if (error.response?.status === 404) {
+          alert(
+            "Authentication service not available. Please try again later."
+          );
+        } else if (error.response?.status === 400) {
+          alert("Invalid Google token. Please try again.");
+        } else {
+          alert(`Google login failed: ${error.message}`);
+        }
       }
     },
-    [login]
+    [loginUser] // Update dependency
   );
 
   const handleGoogleLogin = useCallback(() => {
