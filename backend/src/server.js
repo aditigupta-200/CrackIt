@@ -27,7 +27,12 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: "https://crack-it-jade.vercel.app/", // Your frontend URL
+    origin: [
+      "https://crack-it-jade.vercel.app",
+      "https://crack-it-jade.vercel.app/",
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ], // Multiple allowed origins
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
