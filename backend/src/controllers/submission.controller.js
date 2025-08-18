@@ -262,11 +262,13 @@ export const runCode = async (req, res) => {
       user.streak.lastActiveDate = new Date();
 
       await user.save();
-      
+
       // Check and award badges dynamically based on updated user stats
       const newBadges = await checkAndAwardBadges(user._id);
       if (newBadges.length > 0) {
-        console.log(`🏆 ${newBadges.length} new badges awarded to user ${user._id}`);
+        console.log(
+          `🏆 ${newBadges.length} new badges awarded to user ${user._id}`
+        );
       }
 
       console.log(

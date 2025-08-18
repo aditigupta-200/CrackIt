@@ -135,7 +135,7 @@ const seedBadges = async () => {
     // Find a super admin user to assign as creator
     console.log("Looking for super admin user...");
     const superAdmin = await User.findOne({ role: "super_admin" });
-    
+
     if (!superAdmin) {
       console.log("No super admin found. Looking for any user...");
       const anyUser = await User.findOne({});
@@ -143,12 +143,14 @@ const seedBadges = async () => {
         console.log("No users found in database. Please create a user first.");
         return;
       }
-      console.log(`Using user ${anyUser.username} (${anyUser.role}) as badge creator`);
+      console.log(
+        `Using user ${anyUser.username} (${anyUser.role}) as badge creator`
+      );
     } else {
       console.log(`Found super admin: ${superAdmin.username}`);
     }
 
-    const creatorUser = superAdmin || await User.findOne({});
+    const creatorUser = superAdmin || (await User.findOne({}));
 
     // Check existing badges
     const existingBadges = await Badge.find({});
@@ -161,7 +163,7 @@ const seedBadges = async () => {
     }
 
     // Create badges
-    const badgesWithCreator = defaultBadges.map(badge => ({
+    const badgesWithCreator = defaultBadges.map((badge) => ({
       ...badge,
       createdBy: creatorUser._id,
     }));
@@ -171,12 +173,13 @@ const seedBadges = async () => {
     console.log(`✅ Created ${createdBadges.length} badges successfully!`);
 
     // List created badges
-    createdBadges.forEach(badge => {
-      console.log(`🏆 ${badge.name} - ${badge.description} (${badge.criteria.type}: ${badge.criteria.value})`);
+    createdBadges.forEach((badge) => {
+      console.log(
+        `🏆 ${badge.name} - ${badge.description} (${badge.criteria.type}: ${badge.criteria.value})`
+      );
     });
 
     console.log("Badge seeding completed successfully!");
-
   } catch (error) {
     console.error("Error seeding badges:", error);
   } finally {
@@ -187,11 +190,13 @@ const seedBadges = async () => {
 
 // Run the seeder if called directly
 console.log("Badge seeder script started");
-seedBadges().then(() => {
-  console.log("Seeder process completed");
-}).catch((error) => {
-  console.error("Seeder failed:", error);
-  process.exit(1);
-});
+seedBadges()
+  .then(() => {
+    console.log("Seeder process completed");
+  })
+  .catch((error) => {
+    console.error("Seeder failed:", error);
+    process.exit(1);
+  });
 
 export default seedBadges;

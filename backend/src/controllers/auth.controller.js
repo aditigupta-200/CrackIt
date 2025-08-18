@@ -254,11 +254,15 @@ export const getUserProgress = asyncHandler(async (req, res) => {
     }
 
     // Get all active badges from database
-    const allBadges = await Badge.find({ isActive: true }).sort({ requiredPoints: 1 });
-    
+    const allBadges = await Badge.find({ isActive: true }).sort({
+      requiredPoints: 1,
+    });
+
     // Get user's earned badges
-    const userBadges = await UserBadge.find({ user: req.user._id }).populate('badge');
-    const earnedBadgeIds = userBadges.map(ub => ub.badge._id.toString());
+    const userBadges = await UserBadge.find({ user: req.user._id }).populate(
+      "badge"
+    );
+    const earnedBadgeIds = userBadges.map((ub) => ub.badge._id.toString());
 
     // Calculate difficulty breakdown from submissions
     const submissions = await Submission.find({
@@ -307,10 +311,10 @@ export const getUserProgress = asyncHandler(async (req, res) => {
     };
 
     // Check badge eligibility and format badges
-    const formattedBadges = allBadges.map(badge => {
+    const formattedBadges = allBadges.map((badge) => {
       const isEarned = earnedBadgeIds.includes(badge._id.toString());
       const isEligible = !isEarned && checkBadgeEligibility(badge, userStats);
-      
+
       return {
         _id: badge._id,
         name: badge.name,
@@ -321,13 +325,19 @@ export const getUserProgress = asyncHandler(async (req, res) => {
         color: badge.color,
         earned: isEarned,
         eligible: isEligible,
-        awardedAt: isEarned ? userBadges.find(ub => ub.badge._id.toString() === badge._id.toString())?.awardedAt : null,
+        awardedAt: isEarned
+          ? userBadges.find(
+              (ub) => ub.badge._id.toString() === badge._id.toString()
+            )?.awardedAt
+          : null,
       };
     });
 
     // Find next badge to earn (lowest required points among unearned badges)
-    const unearnedBadges = formattedBadges.filter(badge => !badge.earned);
-    const nextBadge = unearnedBadges.sort((a, b) => a.requiredPoints - b.requiredPoints)[0];
+    const unearnedBadges = formattedBadges.filter((badge) => !badge.earned);
+    const nextBadge = unearnedBadges.sort(
+      (a, b) => a.requiredPoints - b.requiredPoints
+    )[0];
 
     res.json({
       points: user.points || 0,
@@ -352,10 +362,10 @@ export const checkAndAwardBadges = async (userId) => {
 
     // Get all active badges
     const allBadges = await Badge.find({ isActive: true });
-    
+
     // Get user's current badges
     const userBadges = await UserBadge.find({ user: userId });
-    const earnedBadgeIds = userBadges.map(ub => ub.badge.toString());
+    const earnedBadgeIds = userBadges.map((ub) => ub.badge.toString());
 
     // Calculate user stats
     const submissions = await Submission.find({
@@ -386,15 +396,16 @@ export const checkAndAwardBadges = async (userId) => {
     // Check each badge for eligibility
     const newBadges = [];
     for (const badge of allBadges) {
-      if (!earnedBadgeIds.includes(badge._id.toString()) && 
-          checkBadgeEligibility(badge, userStats)) {
-        
+      if (
+        !earnedBadgeIds.includes(badge._id.toString()) &&
+        checkBadgeEligibility(badge, userStats)
+      ) {
         // Award the badge
         await UserBadge.create({
           user: userId,
           badge: badge._id,
         });
-        
+
         newBadges.push(badge);
         console.log(`🏆 Badge awarded: ${badge.name} to user ${userId}`);
       }

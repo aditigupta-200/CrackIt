@@ -1,12 +1,12 @@
 import express from "express";
-import { 
-  createBadge, 
-  getUserBadges, 
-  getAllBadges, 
-  updateBadge, 
-  deleteBadge, 
-  awardBadgeToUser, 
-  getBadgeStats 
+import {
+  createBadge,
+  getUserBadges,
+  getAllBadges,
+  updateBadge,
+  deleteBadge,
+  awardBadgeToUser,
+  getBadgeStats,
 } from "../controllers/badge.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { authorizeRoles } from "../middleware/role.middleware.js";
@@ -26,7 +26,7 @@ router.get("/debug/me", verifyJWT, (req, res) => {
       role: req.user.role,
       email: req.user.email,
     },
-    message: "Current user info"
+    message: "Current user info",
   });
 });
 
@@ -36,7 +36,12 @@ router.post("/", verifyJWT, authorizeRoles("super_admin"), createBadge);
 router.post("/test", verifyJWT, createBadge);
 router.put("/:id", verifyJWT, authorizeRoles("super_admin"), updateBadge);
 router.delete("/:id", verifyJWT, authorizeRoles("super_admin"), deleteBadge);
-router.post("/award", verifyJWT, authorizeRoles("super_admin"), awardBadgeToUser);
+router.post(
+  "/award",
+  verifyJWT,
+  authorizeRoles("super_admin"),
+  awardBadgeToUser
+);
 router.get("/stats", verifyJWT, authorizeRoles("super_admin"), getBadgeStats);
 
 export default router;

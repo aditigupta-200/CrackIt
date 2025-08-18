@@ -23,13 +23,15 @@ const createSuperAdmin = async () => {
 
     // Check if super admin already exists
     let superAdmin = await User.findOne({ role: "super_admin" });
-    
+
     if (superAdmin) {
-      console.log(`Super admin already exists: ${superAdmin.username} (${superAdmin.email})`);
+      console.log(
+        `Super admin already exists: ${superAdmin.username} (${superAdmin.email})`
+      );
     } else {
       // Check if there's a user we can promote
       const existingUser = await User.findOne({});
-      
+
       if (existingUser) {
         // Promote existing user to super admin
         existingUser.role = "super_admin";
@@ -55,7 +57,6 @@ const createSuperAdmin = async () => {
     console.log(`- Email: ${superAdmin.email}`);
     console.log(`- Role: ${superAdmin.role}`);
     console.log(`- ID: ${superAdmin._id}`);
-
   } catch (error) {
     console.error("Error creating super admin:", error);
   } finally {
@@ -66,11 +67,13 @@ const createSuperAdmin = async () => {
 
 // Run the script
 console.log("Super Admin Creator Script Started");
-createSuperAdmin().then(() => {
-  console.log("Script completed");
-}).catch((error) => {
-  console.error("Script failed:", error);
-  process.exit(1);
-});
+createSuperAdmin()
+  .then(() => {
+    console.log("Script completed");
+  })
+  .catch((error) => {
+    console.error("Script failed:", error);
+    process.exit(1);
+  });
 
 export default createSuperAdmin;

@@ -46,13 +46,25 @@ export const createBadge = asyncHandler(async (req, res) => {
   const { name, description, requiredPoints, criteria, icon, color } = req.body;
 
   // Validate criteria structure
-  const validCriteriaTypes = ["difficulty", "streak", "total_problems", "points", "custom"];
+  const validCriteriaTypes = [
+    "difficulty",
+    "streak",
+    "total_problems",
+    "points",
+    "custom",
+  ];
   if (!validCriteriaTypes.includes(criteria.type)) {
     throw new ApiError(400, "Invalid criteria type");
   }
 
-  if (criteria.type === "difficulty" && !["easy", "medium", "hard"].includes(criteria.value)) {
-    throw new ApiError(400, "Invalid difficulty value. Must be easy, medium, or hard");
+  if (
+    criteria.type === "difficulty" &&
+    !["easy", "medium", "hard"].includes(criteria.value)
+  ) {
+    throw new ApiError(
+      400,
+      "Invalid difficulty value. Must be easy, medium, or hard"
+    );
   }
 
   const badge = await Badge.create({
@@ -91,14 +103,25 @@ export const updateBadge = asyncHandler(async (req, res) => {
 
   // Validate criteria if being updated
   if (updateData.criteria) {
-    const validCriteriaTypes = ["difficulty", "streak", "total_problems", "points", "custom"];
+    const validCriteriaTypes = [
+      "difficulty",
+      "streak",
+      "total_problems",
+      "points",
+      "custom",
+    ];
     if (!validCriteriaTypes.includes(updateData.criteria.type)) {
       throw new ApiError(400, "Invalid criteria type");
     }
 
-    if (updateData.criteria.type === "difficulty" && 
-        !["easy", "medium", "hard"].includes(updateData.criteria.value)) {
-      throw new ApiError(400, "Invalid difficulty value. Must be easy, medium, or hard");
+    if (
+      updateData.criteria.type === "difficulty" &&
+      !["easy", "medium", "hard"].includes(updateData.criteria.value)
+    ) {
+      throw new ApiError(
+        400,
+        "Invalid difficulty value. Must be easy, medium, or hard"
+      );
     }
   }
 
@@ -150,7 +173,7 @@ export const getUserBadges = asyncHandler(async (req, res) => {
     .sort({ awardedAt: -1 });
 
   // Filter out badges where the badge document is null (deleted badges)
-  const activeBadges = userBadges.filter(ub => ub.badge !== null);
+  const activeBadges = userBadges.filter((ub) => ub.badge !== null);
 
   res.json({
     success: true,

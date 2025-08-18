@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { getUserBadges, getAllBadges, createBadge, createBadgeTest, debugCurrentUser } from "../services/api";
+import {
+  getUserBadges,
+  getAllBadges,
+  createBadge,
+  createBadgeTest,
+  debugCurrentUser,
+} from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import { Award, Plus, X, Star, Lock, Check, User } from "lucide-react";
 import Navbar from "../components/Navbar";
@@ -34,7 +40,7 @@ const Badges = () => {
         getAllBadges(),
         getUserBadges(),
       ]);
-      
+
       setAllBadges(allBadgesResponse.data.data || allBadgesResponse.data);
       setUserBadges(userBadgesResponse.data.data || userBadgesResponse.data);
     } catch (error) {
@@ -70,21 +76,25 @@ const Badges = () => {
       fetchBadges();
     } catch (error) {
       console.error("Error creating badge:", error);
-      alert(`Failed to create badge: ${error.response?.data?.message || error.message}`);
+      alert(
+        `Failed to create badge: ${
+          error.response?.data?.message || error.message
+        }`
+      );
     }
   };
 
   const isBadgeEarned = (badgeId) => {
-    return userBadges.some(ub => ub.badge?._id === badgeId);
+    return userBadges.some((ub) => ub.badge?._id === badgeId);
   };
 
   const getEarnedBadge = (badgeId) => {
-    return userBadges.find(ub => ub.badge?._id === badgeId);
+    return userBadges.find((ub) => ub.badge?._id === badgeId);
   };
 
   const getCriteriaDescription = (criteria) => {
     const { type, value } = criteria;
-    
+
     switch (type) {
       case "difficulty":
         return `Solve your first ${value} problem`;
@@ -102,7 +112,9 @@ const Badges = () => {
   const handleDebugUser = async () => {
     try {
       const response = await debugCurrentUser();
-      alert(`User Role: ${response.data.user.role}\nUsername: ${response.data.user.username}\nEmail: ${response.data.user.email}`);
+      alert(
+        `User Role: ${response.data.user.role}\nUsername: ${response.data.user.username}\nEmail: ${response.data.user.email}`
+      );
     } catch (error) {
       alert(`Debug Error: ${error.response?.data?.message || error.message}`);
     }
@@ -119,15 +131,19 @@ const Badges = () => {
               {/* User Role Debug Info */}
               <div className="text-sm bg-white px-3 py-2 rounded-lg shadow-sm border">
                 <span className="text-gray-600">Role:</span>{" "}
-                <span className={`font-semibold ${
-                  user?.role === "super_admin" ? "text-green-600" : 
-                  user?.role === "interviewer" ? "text-blue-600" : 
-                  "text-gray-600"
-                }`}>
-                  {user?.role || 'Not logged in'}
+                <span
+                  className={`font-semibold ${
+                    user?.role === "super_admin"
+                      ? "text-green-600"
+                      : user?.role === "interviewer"
+                      ? "text-blue-600"
+                      : "text-gray-600"
+                  }`}
+                >
+                  {user?.role || "Not logged in"}
                 </span>
               </div>
-              
+
               <button
                 onClick={handleDebugUser}
                 className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
@@ -139,13 +155,15 @@ const Badges = () => {
                 <button
                   onClick={() => setShowCreateForm(true)}
                   className={`flex items-center px-4 py-2 rounded text-white ${
-                    user?.role === "super_admin" 
-                      ? "bg-blue-600 hover:bg-blue-700" 
+                    user?.role === "super_admin"
+                      ? "bg-blue-600 hover:bg-blue-700"
                       : "bg-orange-600 hover:bg-orange-700"
                   }`}
                 >
                   <Plus size={16} className="mr-2" />
-                  {user?.role === "super_admin" ? "Create Badge" : "Test Create Badge"}
+                  {user?.role === "super_admin"
+                    ? "Create Badge"
+                    : "Test Create Badge"}
                 </button>
               )}
             </div>
@@ -161,26 +179,31 @@ const Badges = () => {
               {allBadges.map((badge) => {
                 const earnedBadge = getEarnedBadge(badge._id);
                 const isEarned = isBadgeEarned(badge._id);
-                
+
                 return (
                   <div
                     key={badge._id}
                     className={`bg-white rounded-lg shadow-md p-6 transition-all ${
-                      isEarned ? 'ring-2 ring-yellow-400' : 'opacity-75'
+                      isEarned ? "ring-2 ring-yellow-400" : "opacity-75"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <div 
+                      <div
                         className={`p-3 rounded-full text-2xl flex items-center justify-center w-12 h-12`}
-                        style={{ backgroundColor: badge.color + '20', color: badge.color }}
+                        style={{
+                          backgroundColor: badge.color + "20",
+                          color: badge.color,
+                        }}
                       >
-                        {badge.icon || '🏆'}
+                        {badge.icon || "🏆"}
                       </div>
                       <div className="flex items-center">
                         {isEarned ? (
                           <div className="flex items-center text-green-500">
                             <Check size={16} className="mr-1" />
-                            <span className="text-sm font-semibold">Earned</span>
+                            <span className="text-sm font-semibold">
+                              Earned
+                            </span>
                           </div>
                         ) : (
                           <div className="flex items-center text-gray-400">
@@ -191,15 +214,28 @@ const Badges = () => {
                       </div>
                     </div>
 
-                    <h3 className={`text-xl font-bold mb-2 ${isEarned ? 'text-gray-900' : 'text-gray-500'}`}>
+                    <h3
+                      className={`text-xl font-bold mb-2 ${
+                        isEarned ? "text-gray-900" : "text-gray-500"
+                      }`}
+                    >
                       {badge.name}
                     </h3>
 
-                    <p className={`mb-3 ${isEarned ? 'text-gray-600' : 'text-gray-400'}`}>
-                      {badge.description || getCriteriaDescription(badge.criteria)}
+                    <p
+                      className={`mb-3 ${
+                        isEarned ? "text-gray-600" : "text-gray-400"
+                      }`}
+                    >
+                      {badge.description ||
+                        getCriteriaDescription(badge.criteria)}
                     </p>
 
-                    <div className={`bg-gray-50 p-3 rounded mb-3 ${isEarned ? '' : 'opacity-60'}`}>
+                    <div
+                      className={`bg-gray-50 p-3 rounded mb-3 ${
+                        isEarned ? "" : "opacity-60"
+                      }`}
+                    >
                       <p className="text-sm text-gray-700">
                         <span className="font-semibold">Criteria: </span>
                         {getCriteriaDescription(badge.criteria)}
@@ -216,7 +252,9 @@ const Badges = () => {
                     {badge.requiredPoints > 0 && (
                       <div className="mt-3 flex items-center text-yellow-500">
                         <Star size={16} className="mr-1" />
-                        <span className="text-sm">{badge.requiredPoints} pts</span>
+                        <span className="text-sm">
+                          {badge.requiredPoints} pts
+                        </span>
                       </div>
                     )}
                   </div>
@@ -228,10 +266,9 @@ const Badges = () => {
               <Award size={64} className="mx-auto text-gray-400 mb-4" />
               <p className="text-gray-500 text-lg mb-2">No badges available</p>
               <p className="text-gray-400">
-                {user?.role === "super_admin" 
-                  ? "Create badges to get started!" 
-                  : "Check back later for new badges!"
-                }
+                {user?.role === "super_admin"
+                  ? "Create badges to get started!"
+                  : "Check back later for new badges!"}
               </p>
             </div>
           )}
@@ -290,7 +327,9 @@ const Badges = () => {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Description</label>
+                  <label className="block text-gray-700 mb-2">
+                    Description
+                  </label>
                   <textarea
                     className="w-full p-2 border rounded h-24"
                     value={newBadge.description}
@@ -301,7 +340,9 @@ const Badges = () => {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Icon (emoji)</label>
+                  <label className="block text-gray-700 mb-2">
+                    Icon (emoji)
+                  </label>
                   <input
                     type="text"
                     className="w-full p-2 border rounded"
@@ -314,7 +355,9 @@ const Badges = () => {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Color (hex)</label>
+                  <label className="block text-gray-700 mb-2">
+                    Color (hex)
+                  </label>
                   <input
                     type="color"
                     className="w-full p-1 border rounded h-10"
@@ -326,14 +369,19 @@ const Badges = () => {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Criteria Type</label>
+                  <label className="block text-gray-700 mb-2">
+                    Criteria Type
+                  </label>
                   <select
                     className="w-full p-2 border rounded"
                     value={newBadge.criteria.type}
                     onChange={(e) =>
                       setNewBadge({
                         ...newBadge,
-                        criteria: { ...newBadge.criteria, type: e.target.value }
+                        criteria: {
+                          ...newBadge.criteria,
+                          type: e.target.value,
+                        },
                       })
                     }
                   >
@@ -346,7 +394,9 @@ const Badges = () => {
 
                 <div className="mb-4">
                   <label className="block text-gray-700 mb-2">
-                    {newBadge.criteria.type === "difficulty" ? "Difficulty" : "Value"}
+                    {newBadge.criteria.type === "difficulty"
+                      ? "Difficulty"
+                      : "Value"}
                   </label>
                   {newBadge.criteria.type === "difficulty" ? (
                     <select
@@ -355,7 +405,10 @@ const Badges = () => {
                       onChange={(e) =>
                         setNewBadge({
                           ...newBadge,
-                          criteria: { ...newBadge.criteria, value: e.target.value }
+                          criteria: {
+                            ...newBadge.criteria,
+                            value: e.target.value,
+                          },
                         })
                       }
                     >
@@ -371,7 +424,10 @@ const Badges = () => {
                       onChange={(e) =>
                         setNewBadge({
                           ...newBadge,
-                          criteria: { ...newBadge.criteria, value: parseInt(e.target.value) }
+                          criteria: {
+                            ...newBadge.criteria,
+                            value: parseInt(e.target.value),
+                          },
                         })
                       }
                       required
@@ -380,7 +436,9 @@ const Badges = () => {
                 </div>
 
                 <div className="mb-6">
-                  <label className="block text-gray-700 mb-2">Required Points (optional)</label>
+                  <label className="block text-gray-700 mb-2">
+                    Required Points (optional)
+                  </label>
                   <input
                     type="number"
                     className="w-full p-2 border rounded"
