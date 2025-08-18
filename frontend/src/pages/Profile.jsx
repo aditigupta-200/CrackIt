@@ -4,6 +4,7 @@ import {
   getUserProgress,
   getUserProfile,
   getDashboardStats,
+  getUserSubmissions,
 } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -20,6 +21,8 @@ import {
   Code,
   Calendar,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Navbar from "../components/Navbar";
 
@@ -42,7 +45,13 @@ const Profile = () => {
     hardQuestionsSolved: 0,
   });
   const [profileData, setProfileData] = useState(null);
-  const [submissions, setSubmissions] = useState([]);
+  const [allSubmissions, setAllSubmissions] = useState([]);
+  const [submissionsPagination, setSubmissionsPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    hasMore: false,
+    loading: false,
+  });
   const [adminStats, setAdminStats] = useState(null);
 
   useEffect(() => {
@@ -64,7 +73,11 @@ const Profile = () => {
           ]);
           setProgress(progressRes.data);
           setProfileData(profileRes.data);
-          setSubmissions(profileRes.data.submissions || []);
+        }
+
+        // Fetch all submissions for non-admin users
+        if (user?.role !== "super_admin") {
+          await fetchAllSubmissions(1);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -73,6 +86,29 @@ const Profile = () => {
 
     fetchData();
   }, [user]);
+
+  const fetchAllSubmissions = async (page = 1) => {
+    try {
+      setSubmissionsPagination((prev) => ({ ...prev, loading: true }));
+      const response = await getUserSubmissions({ page, limit: 10 });
+
+      if (page === 1) {
+        setAllSubmissions(response.data.submissions);
+      } else {
+        setAllSubmissions((prev) => [...prev, ...response.data.submissions]);
+      }
+
+      setSubmissionsPagination({
+        currentPage: response.data.currentPage,
+        totalPages: response.data.totalPages,
+        hasMore: response.data.hasMore,
+        loading: false,
+      });
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      setSubmissionsPagination((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -748,49 +784,113 @@ const Profile = () => {
 
           {/* Recent Submissions */}
           <div className="mt-6 bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-bold mb-4">Recent Submissions</h3>
-            {submissions.length > 0 ? (
-              <div className="space-y-3">
-                {submissions.map((submission) => (
-                  <div
-                    key={submission._id}
-                    className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900">
-                          {submission.questionTitle}
-                        </div>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span className="flex items-center">
-                            <span
-                              className={`inline-block w-2 h-2 rounded-full mr-2 ${
-                                submission.status === "Accepted"
-                                  ? "bg-green-500"
-                                  : "bg-red-500"
-                              }`}
-                            ></span>
-                            {submission.status}
-                          </span>
-                          <span>{submission.language}</span>
-                          <span>
-                            {submission.testCasesPassed}/
-                            {submission.testCasesTotal} tests passed
-                          </span>
-                          {submission.pointsEarned > 0 && (
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                              +{submission.pointsEarned} pts
+            <h3 className="text-xl font-bold mb-4">All Submissions</h3>
+            {allSubmissions.length > 0 ? (
+              <>
+                <div className="space-y-3">
+                  {allSubmissions.map((submission) => (
+                    <div
+                      key={submission._id}
+                      className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900">
+                            {submission.question?.title ||
+                              submission.questionTitle ||
+                              "Unknown Question"}
+                          </div>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
+                            <span className="flex items-center">
+                              <span
+                                className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                                  submission.status === "Accepted"
+                                    ? "bg-green-500"
+                                    : "bg-red-500"
+                                }`}
+                              ></span>
+                              {submission.status}
                             </span>
-                          )}
+                            <span className="capitalize">
+                              {submission.language}
+                            </span>
+                            <span>
+                              {submission.testCasesPassed}/
+                              {submission.testCasesPassed +
+                                submission.testCasesFailed}{" "}
+                              tests passed
+                            </span>
+                            {submission.pointsEarned > 0 && (
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                +{submission.pointsEarned} pts
+                              </span>
+                            )}
+                            <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">
+                              {submission.question?.difficulty || "N/A"}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {new Date(submission.date).toLocaleDateString()}
+                        <div className="text-sm text-gray-500">
+                          {new Date(
+                            submission.createdAt || submission.date
+                          ).toLocaleDateString()}
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {submissionsPagination.totalPages > 1 && (
+                  <div className="flex justify-between items-center mt-6 pt-4 border-t">
+                    <div className="text-sm text-gray-600">
+                      Page {submissionsPagination.currentPage} of{" "}
+                      {submissionsPagination.totalPages}
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() =>
+                          fetchAllSubmissions(
+                            submissionsPagination.currentPage - 1
+                          )
+                        }
+                        disabled={
+                          submissionsPagination.currentPage === 1 ||
+                          submissionsPagination.loading
+                        }
+                        className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft size={16} className="mr-1" />
+                        Previous
+                      </button>
+                      <button
+                        onClick={() =>
+                          fetchAllSubmissions(
+                            submissionsPagination.currentPage + 1
+                          )
+                        }
+                        disabled={
+                          submissionsPagination.currentPage ===
+                            submissionsPagination.totalPages ||
+                          submissionsPagination.loading
+                        }
+                        className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                        <ChevronRight size={16} className="ml-1" />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+
+                {submissionsPagination.loading && (
+                  <div className="text-center py-4">
+                    <div className="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm shadow rounded-md text-gray-500 bg-white">
+                      Loading...
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <Target size={48} className="mx-auto mb-3 opacity-50" />

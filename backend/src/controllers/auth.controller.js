@@ -165,17 +165,19 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       .limit(10);
 
     // Format submissions for frontend
-    const formattedSubmissions = recentSubmissions.map((submission) => ({
-      _id: submission._id,
-      questionTitle: submission.question.title,
-      status: submission.status,
-      testCasesPassed: submission.testCasesPassed,
-      testCasesFailed: submission.testCasesFailed,
-      testCasesTotal: submission.testCasesPassed + submission.testCasesFailed,
-      pointsEarned: submission.pointsEarned,
-      date: submission.createdAt,
-      language: submission.language,
-    }));
+    const formattedSubmissions = recentSubmissions
+      .filter((submission) => submission.question) // Filter out submissions with null questions
+      .map((submission) => ({
+        _id: submission._id,
+        questionTitle: submission.question?.title || "Unknown Question",
+        status: submission.status,
+        testCasesPassed: submission.testCasesPassed,
+        testCasesFailed: submission.testCasesFailed,
+        testCasesTotal: submission.testCasesPassed + submission.testCasesFailed,
+        pointsEarned: submission.pointsEarned,
+        date: submission.createdAt,
+        language: submission.language,
+      }));
 
     // Calculate total points from submissions (in case user.points is out of sync)
     const totalPointsFromSubmissions = await Submission.aggregate([
@@ -253,6 +255,9 @@ export const getUserProgress = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Check and award any pending badges first
+    await checkAndAwardBadges(req.user._id);
+
     // Get all active badges from database
     const allBadges = await Badge.find({ isActive: true }).sort({
       requiredPoints: 1,
@@ -270,8 +275,9 @@ export const getUserProgress = asyncHandler(async (req, res) => {
       status: "Accepted",
     }).populate("question", "difficulty");
 
-    console.log(
-      `[DEBUG] User ${req.user._id} has ${submissions.length} accepted submissions`
+    // Get user submission statistics - filter out submissions with null questions
+    const validSubmissions = submissions.filter(
+      (submission) => submission.question
     );
 
     const difficultyBreakdown = {
@@ -280,21 +286,57 @@ export const getUserProgress = asyncHandler(async (req, res) => {
       hard: 0,
     };
 
-    submissions.forEach((submission) => {
+    // Get unique questions solved (avoid double counting)
+    const uniqueQuestions = new Set();
+    let totalPointsFromAcceptedSubmissions = 0;
+
+    validSubmissions.forEach((submission) => {
+      const questionId = submission.question._id.toString();
       const difficulty = submission.question?.difficulty?.toLowerCase();
-      if (difficultyBreakdown.hasOwnProperty(difficulty)) {
-        difficultyBreakdown[difficulty]++;
+
+      // Only count each question once
+      if (!uniqueQuestions.has(questionId)) {
+        uniqueQuestions.add(questionId);
+
+        if (difficultyBreakdown.hasOwnProperty(difficulty)) {
+          difficultyBreakdown[difficulty]++;
+        }
+
+        // Calculate points based on difficulty (first solve only)
+        switch (difficulty) {
+          case "easy":
+            totalPointsFromAcceptedSubmissions += 5;
+            break;
+          case "medium":
+            totalPointsFromAcceptedSubmissions += 10;
+            break;
+          case "hard":
+            totalPointsFromAcceptedSubmissions += 20;
+            break;
+        }
       }
     });
 
-    // Calculate total solved questions from actual submissions
-    const totalSolvedQuestions = submissions.length;
+    // Calculate total solved questions from actual unique questions
+    const totalSolvedQuestions = uniqueQuestions.size;
 
-    console.log(`[DEBUG] Difficulty breakdown:`, difficultyBreakdown);
-    console.log(`[DEBUG] Total solved questions:`, totalSolvedQuestions);
-
-    // Update user's solved question counts if they're different
-    if (user.solvedQuestionsCount !== totalSolvedQuestions) {
+    // Recalculate and update user's points if they're out of sync
+    if (user.points !== totalPointsFromAcceptedSubmissions) {
+      console.log(
+        `🔄 Correcting user ${user._id} points: ${user.points} -> ${totalPointsFromAcceptedSubmissions}`
+      );
+      await User.findByIdAndUpdate(req.user._id, {
+        points: totalPointsFromAcceptedSubmissions,
+        solvedQuestionsCount: totalSolvedQuestions,
+        mediumQuestionsSolved: difficultyBreakdown.medium,
+        hardQuestionsSolved: difficultyBreakdown.hard,
+      });
+      user.points = totalPointsFromAcceptedSubmissions;
+      user.solvedQuestionsCount = totalSolvedQuestions;
+      user.mediumQuestionsSolved = difficultyBreakdown.medium;
+      user.hardQuestionsSolved = difficultyBreakdown.hard;
+    } else if (user.solvedQuestionsCount !== totalSolvedQuestions) {
+      // Update solved question counts if they're different
       await User.findByIdAndUpdate(req.user._id, {
         solvedQuestionsCount: totalSolvedQuestions,
         mediumQuestionsSolved: difficultyBreakdown.medium,
@@ -373,13 +415,18 @@ export const checkAndAwardBadges = async (userId) => {
       status: "Accepted",
     }).populate("question", "difficulty");
 
+    // Filter out submissions with null questions
+    const validSubmissions = submissions.filter(
+      (submission) => submission.question
+    );
+
     const difficultyBreakdown = {
       easy: 0,
       medium: 0,
       hard: 0,
     };
 
-    submissions.forEach((submission) => {
+    validSubmissions.forEach((submission) => {
       const difficulty = submission.question?.difficulty?.toLowerCase();
       if (difficultyBreakdown.hasOwnProperty(difficulty)) {
         difficultyBreakdown[difficulty]++;
@@ -389,7 +436,7 @@ export const checkAndAwardBadges = async (userId) => {
     const userStats = {
       points: user.points || 0,
       streakDays: user.streakDays || 0,
-      solvedQuestionsCount: submissions.length,
+      solvedQuestionsCount: validSubmissions.length,
       difficultyBreakdown,
     };
 

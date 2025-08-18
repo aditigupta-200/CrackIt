@@ -656,9 +656,6 @@
 
 // export default Dashboard;
 
-
-
-
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -709,10 +706,14 @@ const Dashboard = () => {
           ]);
 
         setStats({
-          questions: dsaRes.data.length,
-          interviews: interviewsRes.data.length,
-          badges: badgesRes.data.length,
-          streak: progressRes.data.streakDays || 0,
+          questions:
+            dsaRes.data?.data?.questions?.length ||
+            dsaRes.data?.questions?.length ||
+            dsaRes.data?.length ||
+            0,
+          interviews: interviewsRes.data?.length || 0,
+          badges: badgesRes.data?.length || 0,
+          streak: progressRes.data?.streakDays || 0,
         });
 
         setUserProgress(progressRes.data);

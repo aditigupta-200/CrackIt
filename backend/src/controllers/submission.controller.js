@@ -234,46 +234,71 @@ export const runCode = async (req, res) => {
 
     // Update user stats only if all test cases pass
     if (allTestCasesPassed && pointsEarned > 0) {
-      const user = await User.findById(req.user._id);
-      user.points += pointsEarned;
-      user.solvedQuestionsCount += 1;
-      user.questionsSolved += 1;
+      // Check if user has already solved this question before
+      const previousAcceptedSubmission = await Submission.findOne({
+        user: req.user._id,
+        question: questionId,
+        status: "Accepted",
+        _id: { $ne: submission._id }, // Exclude the current submission
+      });
 
-      if (question.difficulty === "medium") {
-        user.mediumQuestionsSolved += 1;
-      } else if (question.difficulty === "hard") {
-        user.hardQuestionsSolved += 1;
-      }
+      const isFirstSolve = !previousAcceptedSubmission;
+      let actualPointsEarned = 0;
 
-      // Award badges for first solve by difficulty
-      // Update streak logic
-      const today = new Date().toDateString();
-      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (isFirstSolve) {
+        // Award points only for first solve
+        actualPointsEarned = pointsEarned;
 
-      if (user.lastSolvedDate === yesterday) {
-        user.streakDays += 1;
-        user.streak.daily += 1;
-      } else if (user.lastSolvedDate !== today) {
-        user.streakDays = 1;
-        user.streak.daily = 1;
-      }
+        const user = await User.findById(req.user._id);
+        user.points += actualPointsEarned;
+        user.solvedQuestionsCount += 1;
+        user.questionsSolved += 1;
 
-      user.lastSolvedDate = today;
-      user.streak.lastActiveDate = new Date();
+        if (question.difficulty === "medium") {
+          user.mediumQuestionsSolved += 1;
+        } else if (question.difficulty === "hard") {
+          user.hardQuestionsSolved += 1;
+        }
 
-      await user.save();
+        // Update streak logic
+        const today = new Date().toDateString();
+        const yesterday = new Date(Date.now() - 86400000).toDateString();
 
-      // Check and award badges dynamically based on updated user stats
-      const newBadges = await checkAndAwardBadges(user._id);
-      if (newBadges.length > 0) {
+        if (user.lastSolvedDate === yesterday) {
+          user.streakDays += 1;
+          user.streak.daily += 1;
+        } else if (user.lastSolvedDate !== today) {
+          user.streakDays = 1;
+          user.streak.daily = 1;
+        }
+
+        user.lastSolvedDate = today;
+        user.streak.lastActiveDate = new Date();
+
+        await user.save();
+
+        // Check and award badges dynamically based on updated user stats
+        const newBadges = await checkAndAwardBadges(user._id);
+        if (newBadges.length > 0) {
+          console.log(
+            `🏆 ${newBadges.length} new badges awarded to user ${user._id}`
+          );
+        }
+
         console.log(
-          `🏆 ${newBadges.length} new badges awarded to user ${user._id}`
+          `✅ User stats updated: Points: ${user.points}, Streak: ${user.streakDays} days`
         );
+      } else {
+        console.log(
+          `🔄 Question already solved by user, no points awarded. Previous submission exists.`
+        );
+        // Update the submission to reflect no points earned for repeat solve
+        await Submission.findByIdAndUpdate(submission._id, { pointsEarned: 0 });
+        actualPointsEarned = 0;
       }
 
-      console.log(
-        `✅ User stats updated: Points: ${user.points}, Streak: ${user.streakDays} days`
-      );
+      // Update response to reflect actual points earned
+      submission.pointsEarned = actualPointsEarned;
     }
 
     // Send comprehensive response
@@ -288,7 +313,7 @@ export const runCode = async (req, res) => {
         testCasesPassed: passedCount,
         testCasesFailed: failedCount,
         totalTestCases: testCaseResults.length,
-        pointsEarned,
+        pointsEarned: submission.pointsEarned, // Use the actual points earned (0 for repeat solves)
         allTestCasesPassed,
       },
       testCaseResults,
@@ -327,4 +352,66 @@ export const submitCode = async (req, res) => {
   // This can be the same as runCode or you can keep it separate
   // For now, let's just call runCode
   return runCode(req, res);
+};
+
+// Get all user submissions with pagination
+export const getUserSubmissions = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const userId = req.user._id;
+
+    const submissions = await Submission.find({ user: userId })
+      .populate("question", "title difficulty")
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
+
+    const total = await Submission.countDocuments({ user: userId });
+
+    res.json({
+      submissions,
+      total,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    });
+  } catch (error) {
+    console.error("Error fetching user submissions:", error);
+    res.status(500).json({
+      message: "Error fetching submissions",
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+};
+
+// Get user submissions for a specific question
+export const getUserSubmissionsByQuestion = async (req, res) => {
+  try {
+    const { questionId } = req.params;
+    const userId = req.user._id;
+
+    const submissions = await Submission.find({
+      user: userId,
+      question: questionId,
+    })
+      .populate("question", "title difficulty")
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Get the latest accepted submission for this question
+    const latestAccepted = submissions.find((sub) => sub.status === "Accepted");
+
+    res.json({
+      submissions,
+      latestAccepted,
+      total: submissions.length,
+    });
+  } catch (error) {
+    console.error("Error fetching question submissions:", error);
+    res.status(500).json({
+      message: "Error fetching question submissions",
+      error: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
 };

@@ -1,6 +1,11 @@
 //DSA.jsx
 import React, { useState, useEffect } from "react";
-import { getDSAQuestions, addDSAQuestion, runCode } from "../services/api";
+import {
+  getDSAQuestions,
+  addDSAQuestion,
+  runCode,
+  getUserSubmissionsByQuestion,
+} from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
 import Editor from "@monaco-editor/react";
 import {
@@ -21,6 +26,7 @@ const DSA = () => {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("javascript");
   const [loading, setLoading] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
     title: "",
@@ -38,6 +44,7 @@ const DSA = () => {
   });
   const [submissionResult, setSubmissionResult] = useState(null);
   const [activeTab, setActiveTab] = useState("testcases");
+  const [userSubmissions, setUserSubmissions] = useState({});
 
   // Helper function for boilerplate placeholders
   const getBoilerplatePlaceholder = (language) => {
@@ -58,24 +65,84 @@ const DSA = () => {
 
   // Load boilerplate code when question or language changes
   useEffect(() => {
-    if (
-      selectedQuestion &&
-      selectedQuestion.boilerplates &&
-      selectedQuestion.boilerplates[language]
-    ) {
-      setCode(selectedQuestion.boilerplates[language]);
-    } else if (selectedQuestion) {
-      // Fallback to default boilerplate if question doesn't have boilerplates
-      setCode(getBoilerplatePlaceholder(language));
-    }
-  }, [selectedQuestion, language]);
+    const loadCode = async () => {
+      if (selectedQuestion) {
+        // First check if user has previous submission for this question
+        try {
+          // Check if we already have submissions for this question
+          let submissions = userSubmissions[selectedQuestion._id];
+
+          if (!submissions) {
+            // Fetch user submissions for this question
+            const response = await getUserSubmissionsByQuestion(
+              selectedQuestion._id
+            );
+            submissions = response.data;
+            setUserSubmissions((prev) => ({
+              ...prev,
+              [selectedQuestion._id]: submissions,
+            }));
+          }
+
+          const latestAccepted = submissions.latestAccepted;
+          if (latestAccepted && latestAccepted.language === language) {
+            setCode(latestAccepted.code);
+            return;
+          }
+
+          // If no previous submission found, load boilerplate
+          if (
+            selectedQuestion.boilerplates &&
+            selectedQuestion.boilerplates[language]
+          ) {
+            setCode(selectedQuestion.boilerplates[language]);
+          } else {
+            // Fallback to default boilerplate if question doesn't have boilerplates
+            setCode(getBoilerplatePlaceholder(language));
+          }
+        } catch (error) {
+          console.error("Error loading user submission:", error);
+          // Fallback to boilerplate on error
+          if (
+            selectedQuestion.boilerplates &&
+            selectedQuestion.boilerplates[language]
+          ) {
+            setCode(selectedQuestion.boilerplates[language]);
+          } else {
+            setCode(getBoilerplatePlaceholder(language));
+          }
+        }
+      }
+    };
+
+    loadCode();
+  }, [selectedQuestion, language, userSubmissions]);
 
   const fetchQuestions = async () => {
     try {
+      setQuestionsLoading(true);
+      console.log("🔍 Fetching DSA questions...");
       const response = await getDSAQuestions();
-      setQuestions(response.data);
+      console.log("📡 DSA API Response:", response);
+
+      // The API returns { data: { statusCode: 200, data: { questions: [...], pagination: {...} }, message: '...' } }
+      const apiData = response.data.data || response.data;
+      console.log("🔍 API Data after extraction:", apiData);
+      const questionsArray = apiData.questions || apiData || [];
+      console.log("📋 Questions array:", questionsArray);
+      console.log("📊 Is questions array?", Array.isArray(questionsArray));
+
+      setQuestions(Array.isArray(questionsArray) ? questionsArray : []);
+      console.log(
+        "✅ Questions set successfully, count:",
+        Array.isArray(questionsArray) ? questionsArray.length : 0
+      );
     } catch (error) {
-      console.error("Error fetching questions:", error);
+      console.error("❌ Error fetching questions:", error);
+      console.error("❌ Error details:", error.response?.data);
+      setQuestions([]); // Ensure questions is always an array even on error
+    } finally {
+      setQuestionsLoading(false);
     }
   };
 
@@ -329,32 +396,67 @@ const DSA = () => {
             <div className="bg-white rounded-lg shadow-md p-4">
               <h2 className="text-xl font-bold mb-4">Questions</h2>
               <div className="space-y-2">
-                {questions.map((question) => (
-                  <div
-                    key={question._id}
-                    onClick={() => {
-                      setSelectedQuestion(question);
-                      setSubmissionResult(null); // Reset results when changing questions
-                    }}
-                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                      selectedQuestion?._id === question._id
-                        ? "border-blue-500 bg-blue-50"
-                        : ""
-                    }`}
-                  >
-                    <div className="font-semibold">{question.title}</div>
-                    <div
-                      className={`inline-block px-2 py-1 rounded text-xs ${getDifficultyColor(
-                        question.difficulty
-                      )}`}
-                    >
-                      {question.difficulty}
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {question.tags.join(", ")}
-                    </div>
+                {questionsLoading ? (
+                  <div className="text-center py-4">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <p className="mt-2 text-gray-600">Loading questions...</p>
                   </div>
-                ))}
+                ) : questions.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>No questions available</p>
+                    <p className="text-sm mt-1">Check console for errors</p>
+                  </div>
+                ) : (
+                  (questions || []).map((question) => {
+                    const questionSubmission = userSubmissions[question._id];
+                    const isQuestionSolved =
+                      questionSubmission && questionSubmission.latestAccepted;
+
+                    return (
+                      <div
+                        key={question._id}
+                        onClick={() => {
+                          setSelectedQuestion(question);
+                          setSubmissionResult(null); // Reset results when changing questions
+                        }}
+                        className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
+                          selectedQuestion?._id === question._id
+                            ? "border-blue-500 bg-blue-50"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold flex items-center">
+                            {question.title}
+                            {isQuestionSolved && (
+                              <CheckCircle
+                                size={16}
+                                className="text-green-500 ml-2"
+                                title="Question solved"
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div
+                          className={`inline-block px-2 py-1 rounded text-xs ${getDifficultyColor(
+                            question.difficulty
+                          )}`}
+                        >
+                          {question.difficulty}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {question.tags?.join(", ") || "No tags"}
+                        </div>
+                        {isQuestionSolved && (
+                          <div className="text-xs text-green-600 mt-1">
+                            ✓ Solved in{" "}
+                            {questionSubmission.latestAccepted.language}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 

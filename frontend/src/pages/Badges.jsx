@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from "react";
-import {
-  getUserBadges,
-  getAllBadges,
-  createBadge,
-  createBadgeTest,
-  debugCurrentUser,
-} from "../services/api";
+import { getUserBadges, getAllBadges, createBadge } from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Award, Plus, X, Star, Lock, Check, User } from "lucide-react";
+import { Award, Plus, X, Star, Lock, Check } from "lucide-react";
 import Navbar from "../components/Navbar";
 
 const Badges = () => {
@@ -53,13 +47,7 @@ const Badges = () => {
   const handleCreateBadge = async (e) => {
     e.preventDefault();
     try {
-      // Use test endpoint if not super_admin, regular endpoint if super_admin
-      if (user?.role === "super_admin") {
-        await createBadge(newBadge);
-      } else {
-        console.log("Using test endpoint for non-super_admin user");
-        await createBadgeTest(newBadge);
-      }
+      await createBadge(newBadge);
       setShowCreateForm(false);
       setNewBadge({
         name: "",
@@ -109,17 +97,6 @@ const Badges = () => {
     }
   };
 
-  const handleDebugUser = async () => {
-    try {
-      const response = await debugCurrentUser();
-      alert(
-        `User Role: ${response.data.user.role}\nUsername: ${response.data.user.username}\nEmail: ${response.data.user.email}`
-      );
-    } catch (error) {
-      alert(`Debug Error: ${error.response?.data?.message || error.message}`);
-    }
-  };
-
   return (
     <>
       <Navbar />
@@ -127,46 +104,15 @@ const Badges = () => {
         <div className="container mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold">Badges & Achievements</h1>
-            <div className="flex items-center gap-3">
-              {/* User Role Debug Info */}
-              <div className="text-sm bg-white px-3 py-2 rounded-lg shadow-sm border">
-                <span className="text-gray-600">Role:</span>{" "}
-                <span
-                  className={`font-semibold ${
-                    user?.role === "super_admin"
-                      ? "text-green-600"
-                      : user?.role === "interviewer"
-                      ? "text-blue-600"
-                      : "text-gray-600"
-                  }`}
-                >
-                  {user?.role || "Not logged in"}
-                </span>
-              </div>
-
+            {user?.role === "super_admin" && (
               <button
-                onClick={handleDebugUser}
-                className="flex items-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                onClick={() => setShowCreateForm(true)}
+                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
               >
-                <User size={16} className="mr-2" />
-                Debug Role
+                <Plus size={16} className="mr-2" />
+                Create Badge
               </button>
-              {user && ( // Show create button for any authenticated user (for testing)
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className={`flex items-center px-4 py-2 rounded text-white ${
-                    user?.role === "super_admin"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-orange-600 hover:bg-orange-700"
-                  }`}
-                >
-                  <Plus size={16} className="mr-2" />
-                  {user?.role === "super_admin"
-                    ? "Create Badge"
-                    : "Test Create Badge"}
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
           {loading ? (
