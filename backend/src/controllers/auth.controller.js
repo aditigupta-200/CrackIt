@@ -1,6 +1,8 @@
 // File: controllers/authController.js
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
+import Badge from "../models/Badge.js";
+import UserBadge from "../models/UserBadge.js";
 import generateToken from "../utils/generateToken.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
@@ -207,6 +209,42 @@ export const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
+// Helper function to check if user meets badge criteria
+const checkBadgeEligibility = (badge, userStats) => {
+  const { criteria } = badge;
+  const { type, value, operator = "greater_equal" } = criteria;
+
+  let userValue;
+  switch (type) {
+    case "difficulty":
+      // For difficulty badges, check if user solved at least 1 problem of that difficulty
+      userValue = userStats.difficultyBreakdown[value.toLowerCase()] || 0;
+      return userValue > 0;
+    case "streak":
+      userValue = userStats.streakDays || 0;
+      break;
+    case "total_problems":
+      userValue = userStats.solvedQuestionsCount || 0;
+      break;
+    case "points":
+      userValue = userStats.points || 0;
+      break;
+    default:
+      return false;
+  }
+
+  switch (operator) {
+    case "equals":
+      return userValue === value;
+    case "greater_than":
+      return userValue > value;
+    case "greater_equal":
+      return userValue >= value;
+    default:
+      return false;
+  }
+};
+
 // Add this function to get user progress/stats
 export const getUserProgress = asyncHandler(async (req, res) => {
   try {
@@ -215,50 +253,12 @@ export const getUserProgress = asyncHandler(async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Get all badges (you might want to create actual Badge documents)
-    const availableBadges = [
-      {
-        _id: "easy_starter",
-        name: "Easy Starter",
-        description: "Solve your first easy problem",
-        requiredPoints: 5,
-        earned: user.badges.includes("Easy Starter"),
-      },
-      {
-        _id: "medium_challenger",
-        name: "Medium Challenger",
-        description: "Solve your first medium problem",
-        requiredPoints: 10,
-        earned: user.badges.includes("Medium Challenger"),
-      },
-      {
-        _id: "hard_conqueror",
-        name: "Hard Conqueror",
-        description: "Solve your first hard problem",
-        requiredPoints: 20,
-        earned: user.badges.includes("Hard Conqueror"),
-      },
-      {
-        _id: "week_streak",
-        name: "7-Day Streak",
-        description: "Maintain a 7-day solving streak",
-        requiredPoints: 35,
-        earned: user.badges.includes("7-Day Streak"),
-      },
-      {
-        _id: "month_streak",
-        name: "30-Day Streak",
-        description: "Maintain a 30-day solving streak",
-        requiredPoints: 150,
-        earned: user.badges.includes("30-Day Streak"),
-      },
-    ];
-
-    // Find next badge to earn
-    const unearned = availableBadges.filter((badge) => !badge.earned);
-    const nextBadge = unearned.sort(
-      (a, b) => a.requiredPoints - b.requiredPoints
-    )[0];
+    // Get all active badges from database
+    const allBadges = await Badge.find({ isActive: true }).sort({ requiredPoints: 1 });
+    
+    // Get user's earned badges
+    const userBadges = await UserBadge.find({ user: req.user._id }).populate('badge');
+    const earnedBadgeIds = userBadges.map(ub => ub.badge._id.toString());
 
     // Calculate difficulty breakdown from submissions
     const submissions = await Submission.find({
@@ -269,7 +269,6 @@ export const getUserProgress = asyncHandler(async (req, res) => {
     console.log(
       `[DEBUG] User ${req.user._id} has ${submissions.length} accepted submissions`
     );
-    console.log(`[DEBUG] User badges:`, user.badges);
 
     const difficultyBreakdown = {
       easy: 0,
@@ -299,20 +298,114 @@ export const getUserProgress = asyncHandler(async (req, res) => {
       });
     }
 
+    // Prepare user stats for badge checking
+    const userStats = {
+      points: user.points || 0,
+      streakDays: user.streakDays || 0,
+      solvedQuestionsCount: totalSolvedQuestions,
+      difficultyBreakdown,
+    };
+
+    // Check badge eligibility and format badges
+    const formattedBadges = allBadges.map(badge => {
+      const isEarned = earnedBadgeIds.includes(badge._id.toString());
+      const isEligible = !isEarned && checkBadgeEligibility(badge, userStats);
+      
+      return {
+        _id: badge._id,
+        name: badge.name,
+        description: badge.description,
+        requiredPoints: badge.requiredPoints,
+        criteria: badge.criteria,
+        icon: badge.icon,
+        color: badge.color,
+        earned: isEarned,
+        eligible: isEligible,
+        awardedAt: isEarned ? userBadges.find(ub => ub.badge._id.toString() === badge._id.toString())?.awardedAt : null,
+      };
+    });
+
+    // Find next badge to earn (lowest required points among unearned badges)
+    const unearnedBadges = formattedBadges.filter(badge => !badge.earned);
+    const nextBadge = unearnedBadges.sort((a, b) => a.requiredPoints - b.requiredPoints)[0];
+
     res.json({
       points: user.points || 0,
-      badges: availableBadges,
+      badges: formattedBadges,
       nextBadge,
       streakDays: user.streakDays || 0,
-      solvedQuestionsCount: totalSolvedQuestions, // Use calculated value
+      solvedQuestionsCount: totalSolvedQuestions,
       mediumQuestionsSolved: difficultyBreakdown.medium,
       hardQuestionsSolved: difficultyBreakdown.hard,
-      difficultyBreakdown, // Add difficulty breakdown
+      difficultyBreakdown,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
+
+// Function to automatically award badges based on user progress
+export const checkAndAwardBadges = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    // Get all active badges
+    const allBadges = await Badge.find({ isActive: true });
+    
+    // Get user's current badges
+    const userBadges = await UserBadge.find({ user: userId });
+    const earnedBadgeIds = userBadges.map(ub => ub.badge.toString());
+
+    // Calculate user stats
+    const submissions = await Submission.find({
+      user: userId,
+      status: "Accepted",
+    }).populate("question", "difficulty");
+
+    const difficultyBreakdown = {
+      easy: 0,
+      medium: 0,
+      hard: 0,
+    };
+
+    submissions.forEach((submission) => {
+      const difficulty = submission.question?.difficulty?.toLowerCase();
+      if (difficultyBreakdown.hasOwnProperty(difficulty)) {
+        difficultyBreakdown[difficulty]++;
+      }
+    });
+
+    const userStats = {
+      points: user.points || 0,
+      streakDays: user.streakDays || 0,
+      solvedQuestionsCount: submissions.length,
+      difficultyBreakdown,
+    };
+
+    // Check each badge for eligibility
+    const newBadges = [];
+    for (const badge of allBadges) {
+      if (!earnedBadgeIds.includes(badge._id.toString()) && 
+          checkBadgeEligibility(badge, userStats)) {
+        
+        // Award the badge
+        await UserBadge.create({
+          user: userId,
+          badge: badge._id,
+        });
+        
+        newBadges.push(badge);
+        console.log(`🏆 Badge awarded: ${badge.name} to user ${userId}`);
+      }
+    }
+
+    return newBadges;
+  } catch (error) {
+    console.error("Error checking and awarding badges:", error);
+    return [];
+  }
+};
 
 // Google Authentication
 export const googleAuth = asyncHandler(async (req, res) => {

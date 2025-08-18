@@ -2,194 +2,228 @@
 import Badge from "../models/Badge.js";
 import UserBadge from "../models/UserBadge.js";
 import User from "../models/User.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import ApiError from "../utils/ApiError.js";
 
-export const createBadge = async (req, res) => {
-  try {
-    const badge = await Badge.create({ ...req.body, createdBy: req.user._id });
-    res.json(badge);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+// Helper function to check if user meets badge criteria
+const checkBadgeEligibility = (badge, userStats) => {
+  const { criteria } = badge;
+  const { type, value, operator = "greater_equal" } = criteria;
+
+  let userValue;
+  switch (type) {
+    case "difficulty":
+      // For difficulty badges, check if user solved at least 1 problem of that difficulty
+      userValue = userStats.difficultyBreakdown[value.toLowerCase()] || 0;
+      return userValue > 0;
+    case "streak":
+      userValue = userStats.streakDays || 0;
+      break;
+    case "total_problems":
+      userValue = userStats.solvedQuestionsCount || 0;
+      break;
+    case "points":
+      userValue = userStats.points || 0;
+      break;
+    default:
+      return false;
+  }
+
+  switch (operator) {
+    case "equals":
+      return userValue === value;
+    case "greater_than":
+      return userValue > value;
+    case "greater_equal":
+      return userValue >= value;
+    default:
+      return false;
   }
 };
 
-export const getUserBadges = async (req, res) => {
-  try {
-    const badges = await UserBadge.find({ user: req.user._id }).populate(
-      "badge"
-    );
-    res.json(badges);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+// Create new badge (super admin only)
+export const createBadge = asyncHandler(async (req, res) => {
+  const { name, description, requiredPoints, criteria, icon, color } = req.body;
+
+  // Validate criteria structure
+  const validCriteriaTypes = ["difficulty", "streak", "total_problems", "points", "custom"];
+  if (!validCriteriaTypes.includes(criteria.type)) {
+    throw new ApiError(400, "Invalid criteria type");
   }
-};
 
-export const getAllBadges = async (req, res) => {
-  try {
-    const badges = await Badge.find({}).sort({ requiredPoints: 1 });
-    res.json(badges);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  if (criteria.type === "difficulty" && !["easy", "medium", "hard"].includes(criteria.value)) {
+    throw new ApiError(400, "Invalid difficulty value. Must be easy, medium, or hard");
   }
-};
 
-export const updateUserBadges = async (userId, pointsEarned) => {
-  try {
-    const user = await User.findById(userId);
+  const badge = await Badge.create({
+    name,
+    description,
+    requiredPoints: requiredPoints || 0,
+    criteria,
+    icon: icon || "🏆",
+    color: color || "#FFD700",
+    createdBy: req.user._id,
+  });
 
-    if (!user) {
-      console.error("User not found for badge update:", userId);
-      return { points: 0, badges: [], newBadges: [] };
+  res.status(201).json({
+    success: true,
+    message: "Badge created successfully",
+    data: badge,
+  });
+});
+
+// Get all badges
+export const getAllBadges = asyncHandler(async (req, res) => {
+  const badges = await Badge.find({ isActive: true })
+    .populate("createdBy", "username")
+    .sort({ requiredPoints: 1 });
+
+  res.json({
+    success: true,
+    data: badges,
+  });
+});
+
+// Update badge (super admin only)
+export const updateBadge = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  // Validate criteria if being updated
+  if (updateData.criteria) {
+    const validCriteriaTypes = ["difficulty", "streak", "total_problems", "points", "custom"];
+    if (!validCriteriaTypes.includes(updateData.criteria.type)) {
+      throw new ApiError(400, "Invalid criteria type");
     }
 
-    // Update user points
-    const oldPoints = user.points;
-    user.points += pointsEarned;
-
-    console.log(
-      `User ${userId} points updated: ${oldPoints} -> ${user.points}`
-    );
-
-    // Get all badges that the user should have based on their points
-    const availableBadges = await Badge.find({
-      requiredPoints: { $lte: user.points },
-    }).sort({ requiredPoints: 1 });
-
-    // Get badges the user already has
-    const existingUserBadges = await UserBadge.find({ user: userId });
-    const existingBadgeIds = existingUserBadges.map((ub) =>
-      ub.badge.toString()
-    );
-
-    // Find new badges to award
-    const newBadges = [];
-    const badgesToAward = availableBadges.filter(
-      (badge) => !existingBadgeIds.includes(badge._id.toString())
-    );
-
-    // Award new badges
-    for (const badge of badgesToAward) {
-      try {
-        const newUserBadge = await UserBadge.create({
-          user: userId,
-          badge: badge._id,
-          awardedAt: new Date(),
-        });
-
-        await newUserBadge.populate("badge");
-        newBadges.push(newUserBadge);
-
-        // Update user's badges array (for backward compatibility)
-        if (!user.badges.includes(badge.name)) {
-          user.badges.push(badge.name);
-        }
-
-        console.log(
-          `Badge awarded to user ${userId}: ${badge.name} (${badge.requiredPoints} points required)`
-        );
-      } catch (error) {
-        console.error(
-          `Error awarding badge ${badge.name} to user ${userId}:`,
-          error
-        );
-      }
+    if (updateData.criteria.type === "difficulty" && 
+        !["easy", "medium", "hard"].includes(updateData.criteria.value)) {
+      throw new ApiError(400, "Invalid difficulty value. Must be easy, medium, or hard");
     }
-
-    // Save user with updated points and badges
-    await user.save();
-
-    // Get updated user badges for response
-    const updatedUserBadges = await UserBadge.find({ user: userId }).populate(
-      "badge"
-    );
-
-    return {
-      points: user.points,
-      badges: user.badges,
-      newBadges: newBadges,
-      totalBadges: updatedUserBadges.length,
-      userBadges: updatedUserBadges,
-    };
-  } catch (error) {
-    console.error("Error updating user badges:", error);
-    return { points: 0, badges: [], newBadges: [], error: error.message };
   }
-};
 
-// Function to check and award badges for existing users
-export const checkUserBadges = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const result = await updateUserBadges(userId, 0); // Check without adding points
-    res.json({
-      message: "Badges checked successfully",
-      ...result,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  const badge = await Badge.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  });
+
+  if (!badge) {
+    throw new ApiError(404, "Badge not found");
   }
-};
 
-// Function to get user progress including badges
-export const getUserProgress = async (req, res) => {
-  try {
-    const userId = req.user._id;
+  res.json({
+    success: true,
+    message: "Badge updated successfully",
+    data: badge,
+  });
+});
 
-    // Get user data
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+// Delete badge (super admin only) - soft delete
+export const deleteBadge = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-    // Get user badges
-    const userBadges = await UserBadge.find({ user: userId }).populate("badge");
+  const badge = await Badge.findByIdAndUpdate(
+    id,
+    { isActive: false },
+    { new: true }
+  );
 
-    // Get all available badges to find next badge
-    const allBadges = await Badge.find({}).sort({ requiredPoints: 1 });
-    const nextBadge = allBadges.find(
-      (badge) => badge.requiredPoints > user.points
-    );
-
-    // Calculate streak days (simplified)
-    const streakDays = user.streak?.daily || 0;
-
-    res.json({
-      points: user.points,
-      badges: userBadges,
-      nextBadge: nextBadge,
-      streakDays: streakDays,
-      questionsSolved: user.questionsSolved,
-      totalBadgesAvailable: allBadges.length,
-      badgesEarned: userBadges.length,
-      submissions: [], // Add submissions if you have a submissions collection
-    });
-  } catch (error) {
-    console.error("Error fetching user progress:", error);
-    res.status(500).json({ message: error.message });
+  if (!badge) {
+    throw new ApiError(404, "Badge not found");
   }
-};
 
-// Function to recalculate all user badges (admin function)
-export const recalculateAllUserBadges = async (req, res) => {
-  try {
-    const users = await User.find({});
-    const results = [];
+  res.json({
+    success: true,
+    message: "Badge deleted successfully",
+  });
+});
 
-    for (const user of users) {
-      const result = await updateUserBadges(user._id, 0);
-      results.push({
-        userId: user._id,
-        username: user.username,
-        points: result.points,
-        badgesCount: result.totalBadges,
-        newBadgesAwarded: result.newBadges.length,
-      });
-    }
+// Get user badges (earned badges for a specific user)
+export const getUserBadges = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
 
-    res.json({
-      message: "All user badges recalculated",
-      results: results,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  const userBadges = await UserBadge.find({ user: userId })
+    .populate({
+      path: "badge",
+      match: { isActive: true },
+    })
+    .sort({ awardedAt: -1 });
+
+  // Filter out badges where the badge document is null (deleted badges)
+  const activeBadges = userBadges.filter(ub => ub.badge !== null);
+
+  res.json({
+    success: true,
+    data: activeBadges,
+  });
+});
+
+// Award badge manually to user (super admin only)
+export const awardBadgeToUser = asyncHandler(async (req, res) => {
+  const { badgeId, userId } = req.body;
+
+  // Check if badge exists
+  const badge = await Badge.findById(badgeId);
+  if (!badge || !badge.isActive) {
+    throw new ApiError(404, "Badge not found");
   }
-};
+
+  // Check if user already has this badge
+  const existingUserBadge = await UserBadge.findOne({
+    user: userId,
+    badge: badgeId,
+  });
+
+  if (existingUserBadge) {
+    throw new ApiError(400, "User already has this badge");
+  }
+
+  // Award the badge
+  const userBadge = await UserBadge.create({
+    user: userId,
+    badge: badgeId,
+  });
+
+  await userBadge.populate([
+    { path: "user", select: "username email" },
+    { path: "badge", select: "name description" },
+  ]);
+
+  res.status(201).json({
+    success: true,
+    message: "Badge awarded successfully",
+    data: userBadge,
+  });
+});
+
+// Get badge statistics (super admin only)
+export const getBadgeStats = asyncHandler(async (req, res) => {
+  const stats = await Badge.aggregate([
+    {
+      $lookup: {
+        from: "userbadges",
+        localField: "_id",
+        foreignField: "badge",
+        as: "awarded",
+      },
+    },
+    {
+      $project: {
+        name: 1,
+        description: 1,
+        criteria: 1,
+        isActive: 1,
+        createdAt: 1,
+        awardedCount: { $size: "$awarded" },
+      },
+    },
+    {
+      $sort: { awardedCount: -1 },
+    },
+  ]);
+
+  res.json({
+    success: true,
+    data: stats,
+  });
+});

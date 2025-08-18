@@ -2,7 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const API = axios.create({
-  baseURL: "https://crackit-final.onrender.com/api", // Production backend
+  baseURL: "http://localhost:5000/api", // Local backend for development
+  // baseURL: "https://crackit-final.onrender.com/api", // Production backend
   withCredentials: true,
 });
 
@@ -53,7 +54,14 @@ export const applyForInterview = (data) => API.post("/interviews/apply", data);
 
 // Badges
 export const getUserBadges = () => API.get("/badges/my");
+export const getAllBadges = () => API.get("/badges");
 export const createBadge = (data) => API.post("/badges", data);
+export const createBadgeTest = (data) => API.post("/badges/test", data); // Temporary test endpoint
+export const updateBadge = (id, data) => API.put(`/badges/${id}`, data);
+export const deleteBadge = (id) => API.delete(`/badges/${id}`);
+export const awardBadgeToUser = (data) => API.post("/badges/award", data);
+export const getBadgeStats = () => API.get("/badges/stats");
+export const debugCurrentUser = () => API.get("/badges/debug/me");
 
 // Notifications
 export const getNotifications = () => API.get("/notifications");

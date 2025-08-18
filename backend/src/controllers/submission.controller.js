@@ -7,6 +7,8 @@ import DSAQuestion from "../models/DSAQuestion.js";
 import { languages } from "../services/languages.js";
 import User from "../models/User.js";
 import Badge from "../models/Badge.js";
+import UserBadge from "../models/UserBadge.js";
+import { checkAndAwardBadges } from "./auth.controller.js";
 
 export const runCode = async (req, res) => {
   const { sourceCode, language, input, questionId } = req.body;
@@ -244,28 +246,6 @@ export const runCode = async (req, res) => {
       }
 
       // Award badges for first solve by difficulty
-      const badgesToAward = [];
-      if (
-        question.difficulty === "easy" &&
-        !user.badges.includes("Easy Starter")
-      ) {
-        badgesToAward.push("Easy Starter");
-      }
-
-      if (
-        question.difficulty === "medium" &&
-        !user.badges.includes("Medium Challenger")
-      ) {
-        badgesToAward.push("Medium Challenger");
-      }
-
-      if (
-        question.difficulty === "hard" &&
-        !user.badges.includes("Hard Conqueror")
-      ) {
-        badgesToAward.push("Hard Conqueror");
-      }
-
       // Update streak logic
       const today = new Date().toDateString();
       const yesterday = new Date(Date.now() - 86400000).toDateString();
@@ -281,26 +261,16 @@ export const runCode = async (req, res) => {
       user.lastSolvedDate = today;
       user.streak.lastActiveDate = new Date();
 
-      // Award streak badges
-      if (user.streakDays >= 7 && !user.badges.includes("7-Day Streak")) {
-        user.badges.push("7-Day Streak");
-        badgesToAward.push("7-Day Streak");
-      }
-
-      if (user.streakDays >= 30 && !user.badges.includes("30-Day Streak")) {
-        user.badges.push("30-Day Streak");
-        badgesToAward.push("30-Day Streak");
-      }
-
-      for (let badge of badgesToAward) {
-        if (!user.badges.includes(badge)) {
-          user.badges.push(badge);
-        }
-      }
-
       await user.save();
+      
+      // Check and award badges dynamically based on updated user stats
+      const newBadges = await checkAndAwardBadges(user._id);
+      if (newBadges.length > 0) {
+        console.log(`🏆 ${newBadges.length} new badges awarded to user ${user._id}`);
+      }
+
       console.log(
-        `✅ User stats updated: Points: ${user.points}, Badges: ${user.badges.length}`
+        `✅ User stats updated: Points: ${user.points}, Streak: ${user.streakDays} days`
       );
     }
 
