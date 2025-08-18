@@ -56,7 +56,57 @@ export const runCode = async (req, res) => {
       console.log(`Processing test case ${i + 1}:`, testCase);
 
       const expectedOutput = (testCase.expectedOutput || "").trim();
-      const formattedInput = testCase.input.replace(/\\n/g, "\n");
+      // Handle multi-line inputs - for Judge0, we need to preserve line structure
+      let formattedInput = testCase.input;
+
+      console.log(
+        `📝 Original input for test case ${i + 1}:`,
+        JSON.stringify(formattedInput)
+      );
+
+      // If input was processed from frontend (space-separated), convert back to proper lines
+      if (formattedInput && !formattedInput.includes("\n")) {
+        // This is likely a space-separated input from frontend processing
+        // We need to reconstruct the proper multi-line format based on the expected structure
+
+        // For the array sum pairs problem, we expect: n, array elements, target
+        const inputParts = formattedInput.split(" ");
+        console.log(`📝 Input parts:`, inputParts);
+
+        if (inputParts.length >= 3) {
+          const n = inputParts[0];
+          const target = inputParts[inputParts.length - 1];
+          const arrayElements = inputParts
+            .slice(1, inputParts.length - 1)
+            .join(" ");
+
+          formattedInput = `${n}\n${arrayElements}\n${target}`;
+          console.log(
+            `📝 Reconstructed input:`,
+            JSON.stringify(formattedInput)
+          );
+        } else {
+          // If we can't reconstruct properly, leave it as is but add warning
+          console.log(
+            `⚠️  Could not reconstruct input format for test case ${
+              i + 1
+            }, using original format`
+          );
+        }
+      } else {
+        // For multi-line inputs, preserve the structure but ensure proper line endings
+        formattedInput = formattedInput.replace(/\r\n/g, "\n").trim();
+        console.log(
+          `📝 Multi-line input preserved:`,
+          JSON.stringify(formattedInput)
+        );
+      }
+
+      console.log(`📝 Test case ${i + 1} input processing:`, {
+        original: testCase.input,
+        formatted: formattedInput,
+        expected: expectedOutput,
+      });
 
       try {
         // Execute code for this test case
@@ -249,9 +299,9 @@ export const runCode = async (req, res) => {
       }
 
       await user.save();
-        console.log(
-          `✅ User stats updated: Points: ${user.points}, Badges: ${user.badges.length}`
-        );
+      console.log(
+        `✅ User stats updated: Points: ${user.points}, Badges: ${user.badges.length}`
+      );
     }
 
     // Send comprehensive response

@@ -25,16 +25,50 @@ const DSA = () => {
   const [newQuestion, setNewQuestion] = useState({
     title: "",
     description: "",
-    difficulty: "easy",
+    difficulty: "Easy",
     tags: "",
-    testCases: [{ input: "", expectedOutput: "" }],
+    constraints: "",
+    boilerplates: {
+      java: "",
+      python: "",
+      javascript: "",
+      cpp: "",
+    },
+    testCases: [{ input: "", expectedOutput: "", isHidden: false }],
   });
   const [submissionResult, setSubmissionResult] = useState(null);
   const [activeTab, setActiveTab] = useState("testcases");
 
+  // Helper function for boilerplate placeholders
+  const getBoilerplatePlaceholder = (language) => {
+    const placeholders = {
+      java: "import java.util.Scanner;\n\npublic class Main {\n    public static int solve(int num1, int num2) {\n        // Your code here\n        return 0;\n    }\n    \n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        int num1 = scanner.nextInt();\n        int num2 = scanner.nextInt();\n        \n        int result = solve(num1, num2);\n        System.out.println(result);\n        \n        scanner.close();\n    }\n}",
+      python:
+        "def solve(num1: int, num2: int) -> int:\n    # Your code here\n    pass\n    \nif __name__ == '__main__':\n    num1, num2 = map(int, input().split())\n    result = solve(num1, num2)\n    print(result)",
+      javascript:
+        "const readline = require('readline');\nconst rl = readline.createInterface({\n    input: process.stdin,\n    output: process.stdout\n});\n\nfunction solve(num1, num2) {\n    // Your code here\n    return 0;\n}\n\nrl.on('line', (input) => {\n    const [num1, num2] = input.split(' ').map(Number);\n    const result = solve(num1, num2);\n    console.log(result);\n    rl.close();\n});",
+      cpp: "#include <iostream>\nusing namespace std;\n\nint solve(int num1, int num2) {\n    // Your code here\n    return 0;\n}\n\nint main() {\n    int num1, num2;\n    cin >> num1 >> num2;\n    \n    int result = solve(num1, num2);\n    cout << result << endl;\n    \n    return 0;\n}",
+    };
+    return placeholders[language] || "";
+  };
+
   useEffect(() => {
     fetchQuestions();
   }, []);
+
+  // Load boilerplate code when question or language changes
+  useEffect(() => {
+    if (
+      selectedQuestion &&
+      selectedQuestion.boilerplates &&
+      selectedQuestion.boilerplates[language]
+    ) {
+      setCode(selectedQuestion.boilerplates[language]);
+    } else if (selectedQuestion) {
+      // Fallback to default boilerplate if question doesn't have boilerplates
+      setCode(getBoilerplatePlaceholder(language));
+    }
+  }, [selectedQuestion, language]);
 
   const fetchQuestions = async () => {
     try {
@@ -84,24 +118,47 @@ const DSA = () => {
       const questionData = {
         ...newQuestion,
         tags: newQuestion.tags.split(",").map((tag) => tag.trim()),
+        // Convert difficulty to lowercase to match backend expectations
+        difficulty: newQuestion.difficulty.toLowerCase(),
+        // Add required fields that might be missing
+        category: "General",
+        // Process test cases to convert multi-line inputs to single line format
+        testCases: newQuestion.testCases.map((testCase) => ({
+          ...testCase,
+          // Convert newlines to spaces for execution (trim to remove extra spaces)
+          input: testCase.input.replace(/\n/g, " ").trim(),
+          // Also process expected output the same way if it has multiple lines
+          expectedOutput: testCase.expectedOutput.replace(/\n/g, " ").trim(),
+        })),
       };
+
+      console.log("Sending question data:", questionData);
+
       await addDSAQuestion(questionData);
       setShowAddForm(false);
       setNewQuestion({
         title: "",
         description: "",
-        difficulty: "easy",
+        difficulty: "Easy",
         tags: "",
-        testCases: [{ input: "", expectedOutput: "" }],
+        constraints: "",
+        boilerplates: {
+          java: "",
+          python: "",
+          javascript: "",
+          cpp: "",
+        },
+        testCases: [{ input: "", expectedOutput: "", isHidden: false }],
       });
       fetchQuestions();
     } catch (error) {
       console.error("Error adding question:", error);
+      console.error("Error response:", error.response?.data);
     }
   };
 
   const getDifficultyColor = (difficulty) => {
-    switch (difficulty) {
+    switch (difficulty.toLowerCase()) {
       case "easy":
         return "text-green-600 bg-green-100";
       case "medium":
@@ -319,6 +376,16 @@ const DSA = () => {
                     <p className="mt-4 text-gray-700">
                       {selectedQuestion.description}
                     </p>
+                    {selectedQuestion.constraints && (
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <h4 className="font-semibold text-yellow-800 mb-2">
+                          Constraints:
+                        </h4>
+                        <p className="text-sm text-yellow-700 whitespace-pre-line">
+                          {selectedQuestion.constraints}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-4">
@@ -403,164 +470,333 @@ const DSA = () => {
 
         {/* Add Question Modal */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Add New Question</h2>
-                <button onClick={() => setShowAddForm(false)}>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h2 className="text-2xl font-bold">Add New Question</h2>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
                   <X size={24} />
                 </button>
               </div>
 
-              <form onSubmit={handleAddQuestion}>
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Title</label>
-                  <input
-                    type="text"
-                    className="w-full p-2 border rounded"
-                    value={newQuestion.title}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, title: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                <form onSubmit={handleAddQuestion}>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">Title</label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded"
+                      value={newQuestion.title}
+                      onChange={(e) =>
+                        setNewQuestion({
+                          ...newQuestion,
+                          title: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                  </div>
 
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    className="w-full p-2 border rounded h-32"
-                    value={newQuestion.description}
-                    onChange={(e) =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        description: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      className="w-full p-2 border rounded h-32"
+                      value={newQuestion.description}
+                      onChange={(e) =>
+                        setNewQuestion({
+                          ...newQuestion,
+                          description: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                  </div>
 
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Difficulty</label>
-                  <select
-                    className="w-full p-2 border rounded"
-                    value={newQuestion.difficulty}
-                    onChange={(e) =>
-                      setNewQuestion({
-                        ...newQuestion,
-                        difficulty: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">
+                      Difficulty
+                    </label>
+                    <select
+                      className="w-full p-2 border rounded"
+                      value={newQuestion.difficulty}
+                      onChange={(e) =>
+                        setNewQuestion({
+                          ...newQuestion,
+                          difficulty: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
 
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">
-                    Tags (comma separated)
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full p-2 border rounded"
-                    value={newQuestion.tags}
-                    onChange={(e) =>
-                      setNewQuestion({ ...newQuestion, tags: e.target.value })
-                    }
-                    placeholder="array, sorting, binary-search"
-                  />
-                </div>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">
+                      Tags (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded"
+                      value={newQuestion.tags}
+                      onChange={(e) =>
+                        setNewQuestion({ ...newQuestion, tags: e.target.value })
+                      }
+                      placeholder="array, sorting, binary-search"
+                    />
+                  </div>
 
-                <div className="mb-4">
-                  <label className="block text-gray-700 mb-2">Test Cases</label>
-                  {newQuestion.testCases.map((testCase, index) => (
-                    <div key={index} className="mb-2">
-                      <div className="flex space-x-2">
-                        <input
-                          type="text"
-                          className="w-1/2 p-2 border rounded"
-                          placeholder="Input"
-                          value={testCase.input}
-                          onChange={(e) => {
-                            const updatedTestCases = [...newQuestion.testCases];
-                            updatedTestCases[index].input = e.target.value;
-                            setNewQuestion({
-                              ...newQuestion,
-                              testCases: updatedTestCases,
-                            });
-                          }}
-                        />
-                        <input
-                          type="text"
-                          className="w-1/2 p-2 border rounded"
-                          placeholder="Expected Output"
-                          value={testCase.expectedOutput}
-                          onChange={(e) => {
-                            const updatedTestCases = [...newQuestion.testCases];
-                            updatedTestCases[index].expectedOutput =
-                              e.target.value;
-                            setNewQuestion({
-                              ...newQuestion,
-                              testCases: updatedTestCases,
-                            });
-                          }}
-                        />
-                      </div>
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2">
+                      Constraints
+                    </label>
+                    <textarea
+                      className="w-full p-2 border rounded h-20"
+                      value={newQuestion.constraints}
+                      onChange={(e) =>
+                        setNewQuestion({
+                          ...newQuestion,
+                          constraints: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., 1 ≤ n ≤ 10^5, Time limit: 2s, Memory limit: 256MB"
+                    />
+                  </div>
+
+                  {/* Boilerplate Code Section */}
+                  <div className="mb-6">
+                    <label className="block text-gray-700 mb-3 font-semibold">
+                      Boilerplate Code
+                    </label>
+                    <div className="space-y-4">
+                      {Object.entries(newQuestion.boilerplates).map(
+                        ([lang, code]) => (
+                          <div key={lang} className="border rounded-lg p-4">
+                            <div className="flex items-center mb-3">
+                              <h4 className="text-sm font-medium text-gray-800 capitalize">
+                                {lang === "cpp"
+                                  ? "C++"
+                                  : lang === "javascript"
+                                  ? "JavaScript"
+                                  : lang.charAt(0).toUpperCase() +
+                                    lang.slice(1)}
+                              </h4>
+                            </div>
+                            <textarea
+                              className="w-full p-3 border rounded font-mono text-sm"
+                              rows="8"
+                              value={code}
+                              onChange={(e) =>
+                                setNewQuestion({
+                                  ...newQuestion,
+                                  boilerplates: {
+                                    ...newQuestion.boilerplates,
+                                    [lang]: e.target.value,
+                                  },
+                                })
+                              }
+                              placeholder={getBoilerplatePlaceholder(lang)}
+                            />
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Test Cases Section */}
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <label className="block text-gray-700 font-semibold">
+                        Test Cases
+                      </label>
                       <button
                         type="button"
-                        className="text-red-500 mt-1"
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                         onClick={() => {
-                          const updatedTestCases = newQuestion.testCases.filter(
-                            (_, i) => i !== index
-                          );
                           setNewQuestion({
                             ...newQuestion,
-                            testCases: updatedTestCases,
+                            testCases: [
+                              ...newQuestion.testCases,
+                              {
+                                input: "",
+                                expectedOutput: "",
+                                isHidden: false,
+                              },
+                            ],
                           });
                         }}
                       >
-                        Remove
+                        Add Test Case
                       </button>
                     </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="text-blue-500 mt-2"
-                    onClick={() => {
-                      setNewQuestion({
-                        ...newQuestion,
-                        testCases: [
-                          ...newQuestion.testCases,
-                          { input: "", expectedOutput: "" },
-                        ],
-                      });
-                    }}
-                  >
-                    Add Test Case
-                  </button>
-                </div>
+                    {newQuestion.testCases.map((testCase, index) => (
+                      <div key={index} className="border rounded-lg p-4 mb-3">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="text-sm font-medium text-gray-800">
+                            Test Case {index + 1}
+                          </h4>
+                          <div className="flex items-center space-x-3">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={testCase.isHidden}
+                                onChange={(e) => {
+                                  const updatedTestCases = [
+                                    ...newQuestion.testCases,
+                                  ];
+                                  updatedTestCases[index].isHidden =
+                                    e.target.checked;
+                                  setNewQuestion({
+                                    ...newQuestion,
+                                    testCases: updatedTestCases,
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-sm text-gray-600">
+                                Hidden
+                              </span>
+                            </label>
+                            {newQuestion.testCases.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedTestCases =
+                                    newQuestion.testCases.filter(
+                                      (_, i) => i !== index
+                                    );
+                                  setNewQuestion({
+                                    ...newQuestion,
+                                    testCases: updatedTestCases,
+                                  });
+                                }}
+                                className="text-red-500 hover:text-red-700 text-sm"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">
+                              Input
+                            </label>
+                            <div className="text-xs text-gray-500 mb-2">
+                              <div className="mb-1">
+                                Enter each input value on a new line:
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded text-xs font-mono">
+                                Example 1 (Two numbers):
+                                <br />
+                                5<br />
+                                3<br />→ Becomes: "5 3"
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded text-xs font-mono mt-1">
+                                Example 2 (Array with spaces):
+                                <br />
+                                3<br />
+                                1 2 3<br />→ Becomes: "3 1 2 3"
+                              </div>
+                              <div className="text-xs text-blue-600 mt-1">
+                                💡 If your input/output naturally contains
+                                spaces, just put them on the same line
+                              </div>
+                            </div>
+                            <textarea
+                              className="w-full p-2 border rounded font-mono text-sm"
+                              rows="4"
+                              placeholder="5&#10;3&#10;&#10;(Each value on new line)"
+                              value={testCase.input}
+                              onChange={(e) => {
+                                const updatedTestCases = [
+                                  ...newQuestion.testCases,
+                                ];
+                                updatedTestCases[index].input = e.target.value;
+                                setNewQuestion({
+                                  ...newQuestion,
+                                  testCases: updatedTestCases,
+                                });
+                              }}
+                            />
+                            <div className="text-xs text-gray-400 mt-1">
+                              Preview: "
+                              {testCase.input.replace(/\n/g, " ").trim()}"
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm text-gray-600 mb-1">
+                              Expected Output
+                            </label>
+                            <div className="text-xs text-gray-500 mb-2">
+                              <div className="mb-1">
+                                Enter the expected result:
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded text-xs font-mono">
+                                Example 1 (Single value):
+                                <br />
+                                8<br />→ Becomes: "8"
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded text-xs font-mono mt-1">
+                                Example 2 (Multiple values):
+                                <br />
+                                1 2 3<br />
+                                4 5 6<br />→ Becomes: "1 2 3 4 5 6"
+                              </div>
+                            </div>
+                            <textarea
+                              className="w-full p-2 border rounded font-mono text-sm"
+                              rows="4"
+                              placeholder="8&#10;&#10;(Expected result)"
+                              value={testCase.expectedOutput}
+                              onChange={(e) => {
+                                const updatedTestCases = [
+                                  ...newQuestion.testCases,
+                                ];
+                                updatedTestCases[index].expectedOutput =
+                                  e.target.value;
+                                setNewQuestion({
+                                  ...newQuestion,
+                                  testCases: updatedTestCases,
+                                });
+                              }}
+                            />
+                            <div className="text-xs text-gray-400 mt-1">
+                              Preview: "
+                              {testCase.expectedOutput
+                                .replace(/\n/g, " ")
+                                .trim()}
+                              "
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-                <div className="flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Add Question
-                  </button>
-                </div>
-              </form>
+                  <div className="flex justify-end space-x-4 pt-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(false)}
+                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Add Question
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         )}
@@ -570,7 +806,3 @@ const DSA = () => {
 };
 
 export default DSA;
-
-
-
-
