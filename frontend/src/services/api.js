@@ -2,8 +2,8 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api", // Local backend for development
-  // baseURL: "https://crackit-final.onrender.com/api", // Production backend
+  // baseURL: "http://localhost:5000/api", // Local backend for development
+  baseURL: "https://crackit-final.onrender.com/api", // Production backend
   withCredentials: true,
 });
 

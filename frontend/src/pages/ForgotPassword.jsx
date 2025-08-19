@@ -24,7 +24,8 @@ const ForgotPassword = () => {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const API_BASE_URL = "http://localhost:5000/api";
+    // const API_BASE_URL = "http://localhost:5000/api";
+    const API_BASE_URL = "https://crackit-final.onrender.com/api";
 
   // Step 1: Request OTP
   const handleRequestOTP = async (e) => {
