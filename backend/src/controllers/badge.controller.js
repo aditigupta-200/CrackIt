@@ -96,6 +96,25 @@ export const getAllBadges = asyncHandler(async (req, res) => {
   });
 });
 
+// Get badge by ID (for sharing)
+export const getBadgeById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const badge = await Badge.findById(id).populate("createdBy", "username");
+
+  if (!badge || !badge.isActive) {
+    return res.status(404).json({
+      success: false,
+      message: "Badge not found",
+    });
+  }
+
+  res.json({
+    success: true,
+    data: badge,
+  });
+});
+
 // Update badge (super admin only)
 export const updateBadge = asyncHandler(async (req, res) => {
   const { id } = req.params;

@@ -1,14 +1,18 @@
-// File: controllers/authController.js
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import Badge from "../models/Badge.js";
 import UserBadge from "../models/UserBadge.js";
+import Notification from "../models/Notification.js";
 import generateToken from "../utils/generateToken.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import Submission from "../models/Submission.js";
 import DSAQuestion from "../models/DSAQuestion.js";
 import { OAuth2Client } from "google-auth-library";
+import {
+  sendBadgeNotificationEmail,
+  sendWelcomeEmail,
+} from "../services/emailService.js";
 
 // Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -20,12 +24,17 @@ export const register = asyncHandler(async (req, res) => {
   const existingUser = await User.findOne({ email });
   if (existingUser) throw new ApiError(400, "User already exists");
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  // No need to hash password here as it's done in pre-save middleware
   const newUser = await User.create({
     username,
     email,
-    password,
+    password, // This will be hashed by the pre-save middleware
     role,
+  });
+
+  // Send welcome email (non-blocking)
+  sendWelcomeEmail(email, username).catch((error) => {
+    console.error("Failed to send welcome email:", error);
   });
 
   res.status(201).json({
@@ -452,6 +461,27 @@ export const checkAndAwardBadges = async (userId) => {
           user: userId,
           badge: badge._id,
         });
+
+        // Create notification
+        await Notification.create({
+          receiver: userId,
+          type: "badge_earned",
+          title: `🏆 Badge Earned: ${badge.name}!`,
+          message: `Congratulations! You've earned the "${badge.name}" badge. ${badge.description}`,
+          data: {
+            badgeId: badge._id,
+            badgeName: badge.name,
+            badgeIcon: badge.icon,
+            badgeColor: badge.color,
+          },
+        });
+
+        // Send email notification (non-blocking)
+        sendBadgeNotificationEmail(user.email, user.username, badge).catch(
+          (error) => {
+            console.error("Failed to send badge notification email:", error);
+          }
+        );
 
         newBadges.push(badge);
         console.log(`🏆 Badge awarded: ${badge.name} to user ${userId}`);

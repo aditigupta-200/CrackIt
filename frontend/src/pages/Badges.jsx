@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { getUserBadges, getAllBadges, createBadge } from "../services/api";
+import {
+  getUserBadges,
+  getAllBadges,
+  createBadge,
+  getUserProgress,
+} from "../services/api";
 import { useAuth } from "../contexts/AuthContext";
-import { Award, Plus, X, Star, Lock, Check } from "lucide-react";
+import { Award, Plus, X, Star, Lock, Check, Share } from "lucide-react";
 import Navbar from "../components/Navbar";
+import BadgeShare from "../components/BadgeShare";
 
 const Badges = () => {
   const { user } = useAuth();
   const [allBadges, setAllBadges] = useState([]);
   const [userBadges, setUserBadges] = useState([]);
+  const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [selectedBadge, setSelectedBadge] = useState(null);
   const [newBadge, setNewBadge] = useState({
     name: "",
     description: "",
@@ -30,18 +39,22 @@ const Badges = () => {
   const fetchBadges = async () => {
     try {
       setLoading(true);
-      const [allBadgesResponse, userBadgesResponse] = await Promise.all([
-        getAllBadges(),
-        getUserBadges(),
-      ]);
+      const [allBadgesResponse, userBadgesResponse, userProgressResponse] =
+        await Promise.all([getAllBadges(), getUserBadges(), getUserProgress()]);
 
       setAllBadges(allBadgesResponse.data.data || allBadgesResponse.data);
       setUserBadges(userBadgesResponse.data.data || userBadgesResponse.data);
+      setUserStats(userProgressResponse.data);
     } catch (error) {
       console.error("Error fetching badges:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleShareBadge = (badge) => {
+    setSelectedBadge(badge);
+    setShowShareDialog(true);
   };
 
   const handleCreateBadge = async (e) => {
@@ -189,10 +202,20 @@ const Badges = () => {
                     </div>
 
                     {isEarned && earnedBadge?.awardedAt && (
-                      <div className="text-sm text-green-600 font-medium">
+                      <div className="text-sm text-green-600 font-medium mb-3">
                         ✅ Earned on{" "}
                         {new Date(earnedBadge.awardedAt).toLocaleDateString()}
                       </div>
+                    )}
+
+                    {isEarned && (
+                      <button
+                        onClick={() => handleShareBadge(badge)}
+                        className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg mb-3 flex items-center justify-center hover:bg-blue-600 transition-colors"
+                      >
+                        <Share size={16} className="mr-2" />
+                        Share Badge
+                      </button>
                     )}
 
                     {badge.requiredPoints > 0 && (
@@ -416,6 +439,19 @@ const Badges = () => {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Badge Share Dialog */}
+        {selectedBadge && userStats && (
+          <BadgeShare
+            badge={selectedBadge}
+            userStats={userStats}
+            isOpen={showShareDialog}
+            onClose={() => {
+              setShowShareDialog(false);
+              setSelectedBadge(null);
+            }}
+          />
         )}
       </div>
     </>

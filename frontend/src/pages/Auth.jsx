@@ -80,6 +80,16 @@ const Login = () => {
             Login with Email
           </button>
         </form>
+
+        <div className="mt-4 text-center">
+          <Link
+            to="/forgot-password"
+            className="text-blue-600 hover:text-blue-700 text-sm"
+          >
+            Forgot your password?
+          </Link>
+        </div>
+
         <p className="mt-4 text-center">
           Don't have an account?{" "}
           <Link to="/register" className="text-blue-600">

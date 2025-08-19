@@ -59,6 +59,7 @@ export const applyForInterview = (data) => API.post("/interviews/apply", data);
 // Badges
 export const getUserBadges = () => API.get("/badges/my");
 export const getAllBadges = () => API.get("/badges");
+export const getBadgeById = (id) => API.get(`/badges/${id}`);
 export const createBadge = (data) => API.post("/badges", data);
 export const updateBadge = (id, data) => API.put(`/badges/${id}`, data);
 export const deleteBadge = (id) => API.delete(`/badges/${id}`);

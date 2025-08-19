@@ -3,6 +3,7 @@ import {
   createBadge,
   getUserBadges,
   getAllBadges,
+  getBadgeById,
   updateBadge,
   deleteBadge,
   awardBadgeToUser,
@@ -16,8 +17,12 @@ const router = express.Router();
 // Public routes
 router.get("/", getAllBadges);
 
-// User routes (authenticated)
+// User routes (authenticated) - MUST come before /:id route
 router.get("/my", verifyJWT, getUserBadges);
+router.get("/stats", verifyJWT, authorizeRoles("super_admin"), getBadgeStats);
+
+// Public route for sharing - MUST come after specific routes
+router.get("/:id", getBadgeById);
 
 // Admin routes (super admin only)
 router.post("/", verifyJWT, authorizeRoles("super_admin"), createBadge);
@@ -29,6 +34,5 @@ router.post(
   authorizeRoles("super_admin"),
   awardBadgeToUser
 );
-router.get("/stats", verifyJWT, authorizeRoles("super_admin"), getBadgeStats);
 
 export default router;

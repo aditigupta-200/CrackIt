@@ -11,10 +11,12 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 // Import Pages
 import { Login, Register } from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import DSA from "./pages/DSA";
 import Interviews from "./pages/Interview";
 import Badges from "./pages/Badges";
+import BadgeSharePage from "./pages/BadgeSharePage";
 import { Notifications } from "./pages/Notifications";
 import { Admin } from "./pages/Admin";
 
@@ -30,6 +32,11 @@ function App() {
               {/* Public Routes */}
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route
+                path="/badge-share/:badgeId"
+                element={<BadgeSharePage />}
+              />
 
               {/* Protected Routes */}
               <Route

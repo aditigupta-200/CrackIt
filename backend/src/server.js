@@ -13,6 +13,7 @@ import badgeRoutes from "./routes/badge.route.js";
 import interviewRoutes from "./routes/interview.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import superAdminRoutes from "./routes/superAdmin.route.js";
+import forgotPasswordRoutes from "./routes/forgotPassword.route.js";
 
 // Load environment variables
 dotenv.config();
@@ -57,6 +58,7 @@ app.use("/api/badges", badgeRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/forgot-password", forgotPasswordRoutes);
 
 // Default Route
 app.get("/", (req, res) => {
